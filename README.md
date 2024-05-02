@@ -14,3 +14,7 @@
    1) cookie
    2) header（当cookie被禁用时）
    3) 查询参数（当cookie被禁用时）
+
+### week3重构与复习
+（0） 学习内容：
+<img src="image/week3.png">
