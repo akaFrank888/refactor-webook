@@ -4,9 +4,11 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
+	"time"
 )
 
 const (
@@ -39,7 +41,8 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/users")
 	// note 第二个参数本质上是 ...HandlerFunc （参数为*gin.Context的匿名函数）
 	g.POST("/signup", h.SignUp)
-	g.POST("/login", h.Login)
+	//g.POST("/login", h.Login)
+	g.POST("/login", h.LoginJWT)
 	g.GET("/profile", h.profile)
 }
 
@@ -118,6 +121,60 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	}
 }
 
+func (h *UserHandler) LoginJWT(ctx *gin.Context) {
+	type Req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	user, err := h.svc.Login(ctx, req.Email, req.Password)
+	switch err {
+	case nil:
+		uc := UserClaims{
+			Uid: user.Id,
+			// 定义JWT过期时间 —— 1min
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			},
+		}
+		// 此token只是jwt的一个token结构体
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+		// 此tokenStr才是传输的token
+
+		tokenStr, err := token.SignedString(JWTKey)
+		if err != nil {
+			ctx.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
+		}
+		// 添加进响应的header中
+		ctx.Header("x-jwt-token", tokenStr)
+		ctx.JSON(http.StatusOK, Result{
+			Data: user,
+			Msg:  "登录成功",
+		})
+
+	case service.ErrInvalidEmailOrPassword:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "邮箱或密码错误",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+}
+
 func (h *UserHandler) Login(ctx *gin.Context) {
 	type Req struct {
 		Email    string `json:"email"`
@@ -139,8 +196,9 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		// 为了在profile等接口取出uid
 		session.Set("userId", user.Id)
 		session.Options(sessions.Options{
-			// note sessions.Options里的field都是http.Cookie的子集（看源码）
-			MaxAge: 900,
+			// note sessions.Options可以理解为初始化存ssid的Cookie【在login的响应Header中的setCookie中会有展示max-age】
+			// note 但 MaxAge 这一属性不同，在redis实现中，同时控制了cookie的过期时间，和session数据的过期时间（userId）
+			MaxAge: 30,
 		})
 		err := session.Save()
 		if err != nil {
@@ -167,5 +225,14 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (h *UserHandler) profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "这是!!!!!!!!!!!!!!!!")
+	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
+	// uc := ctx.MustGet("user").(UserClaims)
+
+}
+
+var JWTKey = []byte("oIft1b5qZjyLcc0zZo2UrUx5rk3KE0LvZKv73fw502oXd6vfYu1OAQvbSel8whvm")
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid int64
 }
