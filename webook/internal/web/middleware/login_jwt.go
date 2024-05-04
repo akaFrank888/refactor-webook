@@ -45,6 +45,11 @@ func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+		if uc.UserAgent != ctx.GetHeader("user-agent") {
+			// todo 埋点，正常用户不会进入该分支
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
 
 		// 二、刷新JWT的过期时间
 		expireTime := uc.ExpiresAt

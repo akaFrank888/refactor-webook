@@ -33,6 +33,10 @@
 6. JWT在后面退出登录的用法：
    1) JWT存储userId，用userId组成类似user.info:123的key，再用这个key去redis中取敏感信息
 
+（2）待办：
+1. 限流：利用rua脚本实现基于redis的对登录和注册的限流
+
+
 
 ### week4重构与复习 （记得新建branch）
 
