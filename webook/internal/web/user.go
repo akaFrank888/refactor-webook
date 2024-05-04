@@ -236,6 +236,6 @@ var JWTKey = []byte("oIft1b5qZjyLcc0zZo2UrUx5rk3KE0LvZKv73fw502oXd6vfYu1OAQvbSel
 type UserClaims struct {
 	jwt.RegisteredClaims
 	Uid int64
-	// note 利用请求头的User-Agent来增强安全性（防止jwt被攻击者获取）
+	// note 利用请求头的User-Agent来增强安全性（防止jwt被攻击者获取）  User-Agent含有浏览器的信息
 	UserAgent string
 }
