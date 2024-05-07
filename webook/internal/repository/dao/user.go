@@ -10,14 +10,16 @@ import (
 )
 
 var (
-	ErrUserDuplicateEmail = errors.New("邮箱冲突")
-	ErrRecordNotFound     = gorm.ErrRecordNotFound
+	ErrUserDuplicateUser = errors.New("邮箱/手机号冲突")
+	ErrRecordNotFound    = gorm.ErrRecordNotFound
 )
 
 type UserDao interface {
 	Insert(ctx context.Context, user User) error
 	FindByEmail(ctx context.Context, email string) (User, error)
 	FindById(ctx context.Context, id int64) (User, error)
+	UpdateById(ctx context.Context, user User) error
+	FindByPhone(ctx context.Context, phone string) (User, error)
 }
 
 func (dao *GormUserDao) FindById(ctx context.Context, id int64) (User, error) {
@@ -45,7 +47,7 @@ func (dao *GormUserDao) Insert(ctx context.Context, user User) error {
 	if me, ok := err.(*mysql.MySQLError); ok {
 		const uniqueDuplicateKeyError uint16 = 1062
 		if me.Number == uniqueDuplicateKeyError {
-			return ErrUserDuplicateEmail
+			return ErrUserDuplicateUser
 		}
 	}
 	return err
@@ -57,13 +59,34 @@ func (dao *GormUserDao) FindByEmail(ctx context.Context, email string) (User, er
 	return user, err
 }
 
+func (dao *GormUserDao) UpdateById(ctx context.Context, user User) error {
+	return dao.db.WithContext(ctx).Model(&user).Where("id=?", user.Id).Updates(map[string]any{
+		"utime":    time.Now().UnixMilli(), // 更新时间
+		"nickname": user.Nickname,
+		"birthday": user.Birthday,
+		"resume":   user.Resume,
+	}).Error
+}
+
+func (dao *GormUserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var user User
+	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
+
+	return user, err
+}
+
 type User struct {
 	Id int64 `gorm:"primary_key, autoIncrement"`
 	// note 可为null，因为可以不用email注册，而用手机号
 	Email    sql.NullString `gorm:"unique"`
 	Password string
+	Phone    sql.NullString `gorm:"unique"`
 
 	// 创建时间  避免时区问题，一律用 UTC 0 的毫秒数【若要转成符合中国的时区，要么让前端处理，要么在web层给前端的时候转成UTC 8 的时区】
 	Ctime int64
 	Utime int64
+
+	Nickname string `gorm:"type=varchar(20)"`
+	Birthday int64
+	Resume   string `gorm:"type=varchar(200)"`
 }

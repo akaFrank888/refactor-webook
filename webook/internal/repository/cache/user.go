@@ -12,6 +12,7 @@ import (
 type UserCache interface {
 	Get(ctx context.Context, id int64) (domain.User, error)
 	Set(ctx context.Context, user domain.User) error
+	Del(ctx context.Context, id int64) error
 }
 
 // RedisUserCache note 用Redis实现的Cache，后面可继续实现基于内存等其他的Cache的具体实现
@@ -27,12 +28,13 @@ func NewUserCache(cmd redis.Cmdable) UserCache {
 	}
 }
 
-func (uc *RedisUserCache) Key(id int64) string {
+// key首字母小写，是内部方法（不暴露在接口中）
+func (uc *RedisUserCache) key(id int64) string {
 	return fmt.Sprintf("user:info:%d", id) // note 向repo层屏蔽key的组成
 }
 
 func (uc *RedisUserCache) Set(ctx context.Context, user domain.User) error {
-	key := uc.Key(user.Id)
+	key := uc.key(user.Id)
 	val, err := json.Marshal(user) // note 向repo层屏蔽序列化过程
 	if err != nil {
 		return err
@@ -41,7 +43,7 @@ func (uc *RedisUserCache) Set(ctx context.Context, user domain.User) error {
 }
 
 func (uc *RedisUserCache) Get(ctx context.Context, id int64) (domain.User, error) {
-	key := uc.Key(id)
+	key := uc.key(id)
 	val, err := uc.cmd.Get(ctx, key).Result() // note 要加Result()
 	if err != nil {
 		return domain.User{}, err
@@ -49,6 +51,10 @@ func (uc *RedisUserCache) Get(ctx context.Context, id int64) (domain.User, error
 	user := domain.User{}
 	err = json.Unmarshal([]byte(val), &user)
 	return user, err
+}
+
+func (uc *RedisUserCache) Del(ctx context.Context, id int64) error {
+	return uc.cmd.Del(ctx, uc.key(id)).Err()
 }
 
 /*

@@ -16,8 +16,11 @@ func (b *LoginMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 	// 注意gob.Register写的位置
 	gob.Register(time.Now())
 	return func(ctx *gin.Context) {
-		if ctx.Request.URL.Path == "/users/signup" ||
-			ctx.Request.URL.Path == "/users/login" {
+		path := ctx.Request.URL.Path
+		if path == "/users/signup" ||
+			path == "/users/login" ||
+			path == "/users/login_sms/code/send" ||
+			path == "/users/login_sms" {
 			return
 		}
 		// 登录校验

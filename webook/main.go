@@ -3,11 +3,14 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	redis_contrib "github.com/gin-contrib/sessions/redis"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"refactor-webook/webook/internal/repository"
+	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
 	"refactor-webook/webook/internal/service"
+	"refactor-webook/webook/internal/service/localsms"
 	"refactor-webook/webook/internal/web"
 	"refactor-webook/webook/internal/web/middleware"
 	"strings"
@@ -17,10 +20,11 @@ import (
 )
 
 func main() {
-	server := initWebServer()
 
 	db := dao.InitDB()
-	initUserHdl(db, server)
+	cmd := cache.InitRedis()
+	server := initWebServer()
+	initUserHdl(db, cmd, server)
 
 	server.Run(":8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
@@ -58,12 +62,27 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUserHdl(db *gorm.DB, server *gin.Engine) {
-	userDao := dao.NewUserDao(db)
-	userRepository := repository.NewUserRepository(userDao)
-	userService := service.NewUserService(userRepository)
-	h := web.NewUserHandler(userService)
+func initUserHdl(db *gorm.DB, cmd redis.Cmdable, server *gin.Engine) {
+	userService := initUserService(db, cmd)
+	codeService := initCodeService(cmd)
+
+	h := web.NewUserHandler(userService, codeService)
 	h.RegisterRoutes(server)
+}
+
+func initUserService(db *gorm.DB, cmd redis.Cmdable) service.UserService {
+	userDao := dao.NewUserDao(db)
+	userCache := cache.NewUserCache(cmd)
+	userRepository := repository.NewUserRepository(userDao, userCache)
+	userService := service.NewUserService(userRepository)
+	return userService
+}
+
+func initCodeService(cmd redis.Cmdable) service.CodeService {
+	codeCache := cache.NewCodeCache(cmd)
+	codeRepo := repository.NewCodeRepository(codeCache)
+	// localsms.NewService() 是本地实现的sms，用于测试而已
+	return service.NewCodeService(codeRepo, localsms.NewService())
 }
 
 func useJWT(server *gin.Engine) {
@@ -82,7 +101,7 @@ func useSession(server *gin.Engine) {
 	//	[]byte("zfIxdNzQo55gAc1wZvhtlulPQ9eI4YbzyjtfNwHNxsY1SnZ7Bhd4Kd9xoBu23tTc"))
 
 	// note session存储方式三：基于redis存储
-	store, err := redis.NewStore(16, "tcp", "localhost:6379", "",
+	store, err := redis_contrib.NewStore(16, "tcp", "localhost:6379", "",
 		// 不要写成64位，bug找了好久
 		[]byte("0aPe1L0TQxjcBN9nPRxyDbhuBEnUUhDg"),
 		[]byte("0aPe1L0TQxjcBN9nPRxyDbhuBEnUUhDg"))

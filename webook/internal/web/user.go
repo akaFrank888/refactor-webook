@@ -17,22 +17,26 @@ const (
 	emailRegexPattern = `^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$`
 	// 至少包含1个字母、1个数字、1个特殊字符且密码总长度至少为8个字符
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+
+	bizLogin = "login"
 )
 
 type UserHandler struct {
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
 
-	svc service.UserService
+	svc     service.UserService
+	codeSvc service.CodeService
 }
 
-func NewUserHandler(svc service.UserService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		// note 预编译正则表达式来提高校验速度
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
 
-		svc: svc,
+		svc:     svc,
+		codeSvc: codeSvc,
 	}
 }
 
@@ -44,6 +48,9 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//g.POST("/login", h.Login)
 	g.POST("/login", h.LoginJWT)
 	g.GET("/profile", h.profile)
+	g.POST("/edit", h.edit)
+	g.POST("/login_sms/code/send", h.SendSMSLoginCode)
+	g.POST("/login_sms", h.LoginSMS)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -108,7 +115,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, Result{
 			Msg: "注册成功",
 		})
-	case service.ErrUserDuplicateEmail:
+	case service.ErrDuplicateUser:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 4,
 			Msg:  "邮箱冲突",
@@ -137,32 +144,11 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	user, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		uc := UserClaims{
-			Uid:       user.Id,
-			UserAgent: ctx.GetHeader("user-agent"),
-			// 定义JWT过期时间 —— 1min
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
-			},
-		}
-		// 此token只是jwt的一个token结构体
-		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-		// 此tokenStr才是传输的token
-
-		tokenStr, err := token.SignedString(JWTKey)
-		if err != nil {
-			ctx.JSON(http.StatusOK, Result{
-				Code: 5,
-				Msg:  "系统错误",
-			})
-		}
-		// 添加进响应的header中
-		ctx.Header("x-jwt-token", tokenStr)
+		h.setJWTToken(ctx, user.Id)
 		ctx.JSON(http.StatusOK, Result{
 			Data: user,
 			Msg:  "登录成功",
 		})
-
 	case service.ErrInvalidEmailOrPassword:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 4,
@@ -226,9 +212,205 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (h *UserHandler) profile(ctx *gin.Context) {
-	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
-	// uc := ctx.MustGet("user").(UserClaims)
 
+	/*
+		// 方式一：从session中取uid
+		session := sessions.Default(ctx)
+		userId := session.Get("userId").(int64)
+	*/
+
+	// 方式二：从jwt中取uid
+	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
+	uc := ctx.MustGet("user").(UserClaims)
+	userId := uc.Uid
+
+	u, err := h.svc.FindById(ctx, userId)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	// note 不能直接将domain返回给前端，重新构建一个struct，并返回指定字段
+	type User struct {
+		Nickname string `json:"nickname"`
+		Email    string `json:"email"`
+		Birthday string `json:"birthday"`
+		Resume   string `json:"resume"`
+	}
+
+	ctx.JSON(http.StatusOK, User{
+		Nickname: u.Nickname,
+		Email:    u.Email,
+		Birthday: u.Birthday.Format(time.DateOnly),
+		Resume:   u.Resume,
+	})
+
+}
+
+func (h *UserHandler) edit(ctx *gin.Context) {
+	/*
+		// 方式一：从session中取uid
+		session := sessions.Default(ctx)
+		userId := session.Get("userId").(int64)
+	*/
+
+	// 方式二：从jwt中取uid
+	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
+	uc := ctx.MustGet("user").(UserClaims)
+	userId := uc.Uid
+
+	type Req struct {
+		Nickname string `json:"nickname"`
+		Birthday string `json:"birthday"`
+		Resume   string `json:"resume"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// note 对Birthday的校验，可以不用regex，但返回的是time类型 （忽略对 nickname 和 resume 的校验）
+	birthday, err := time.Parse(time.DateOnly, req.Birthday)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "生日格式不对",
+		})
+		return
+	}
+
+	err = h.svc.UpdateNonSensitiveInfo(ctx, domain.User{
+		Id:       userId,
+		Nickname: req.Nickname,
+		Birthday: birthday,
+		Resume:   req.Resume,
+	})
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "修改成功",
+	})
+}
+
+func (h *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+
+	// 校验一下phone
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "手机号不能为空",
+		})
+	}
+
+	// 调用codeSvc
+	err := h.codeSvc.Send(ctx, bizLogin, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	switch err {
+	case nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+	case service.ErrCodeSendTooMany:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "发送太频繁",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+
+}
+
+func (h *UserHandler) LoginSMS(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+
+	ok, err := h.codeSvc.Verify(ctx, bizLogin, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码错误",
+		})
+	}
+
+	// 验证码正确 ==》 实现用phone注册并登录
+	u, err := h.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	// 登录成功后，设置JWT
+	h.setJWTToken(ctx, u.Id)
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "登录成功",
+	})
+
+}
+
+func (h *UserHandler) setJWTToken(ctx *gin.Context, uid int64) {
+	uc := UserClaims{
+		Uid:       uid,
+		UserAgent: ctx.GetHeader("user-agent"),
+		// 定义JWT过期时间 —— 1min
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
+	// 此token只是jwt的一个token结构体
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+	// 此tokenStr才是传输的token
+
+	tokenStr, err := token.SignedString(JWTKey)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	// 添加进响应的header中
+	ctx.Header("x-jwt-token", tokenStr)
 }
 
 var JWTKey = []byte("oIft1b5qZjyLcc0zZo2UrUx5rk3KE0LvZKv73fw502oXd6vfYu1OAQvbSel8whvm")

@@ -15,8 +15,11 @@ type LoginJWTMiddleWareBuilder struct {
 
 func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		if ctx.Request.URL.Path == "/users/signup" ||
-			ctx.Request.URL.Path == "/users/login" {
+		path := ctx.Request.URL.Path
+		if path == "/users/signup" ||
+			path == "/users/login" ||
+			path == "/users/login_sms/code/send" ||
+			path == "/users/login_sms" {
 			return
 		}
 		// 一、JTW的登录校验：解析JWT

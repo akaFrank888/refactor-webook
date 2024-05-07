@@ -6,17 +6,20 @@ import (
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
+	"time"
 )
 
 var (
-	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
-	ErrUserNotFound       = dao.ErrRecordNotFound
+	ErrDuplicateUser = dao.ErrUserDuplicateUser
+	ErrUserNotFound  = dao.ErrRecordNotFound
 )
 
 type UserRepository interface {
 	Create(ctx context.Context, user domain.User) error
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	FindById(ctx context.Context, id int64) (domain.User, error)
+	UpdateNonZeroFields(ctx context.Context, user domain.User) error
+	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 }
 
 type CacheDUserRepository struct {
@@ -79,6 +82,27 @@ func (repo *CacheDUserRepository) FindById(ctx context.Context, id int64) (domai
 	return user, nil
 }
 
+func (repo *CacheDUserRepository) UpdateNonZeroFields(ctx context.Context, user domain.User) error {
+	// 先更新DB，后更新cache
+	err := repo.dao.UpdateById(ctx, toPersistent(user))
+	if err != nil {
+		return err
+	}
+	// note 延迟一秒，忽略err
+	time.AfterFunc(time.Second, func() {
+		_ = repo.cache.Del(ctx, user.Id)
+	})
+	return repo.cache.Del(ctx, user.Id)
+}
+
+func (repo *CacheDUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	user, err := repo.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return toDomain(user), nil
+}
+
 func toPersistent(user domain.User) dao.User {
 	return dao.User{
 		Id: user.Id,
@@ -87,6 +111,13 @@ func toPersistent(user domain.User) dao.User {
 			Valid:  user.Email != "",
 		},
 		Password: user.Password,
+		Phone: sql.NullString{
+			String: user.Phone,
+			Valid:  user.Phone != "",
+		},
+		Nickname: user.Nickname,
+		Birthday: user.Birthday.UnixMilli(),
+		Resume:   user.Resume,
 	}
 
 }
@@ -96,5 +127,12 @@ func toDomain(user dao.User) domain.User {
 		Id:       user.Id,
 		Email:    user.Email.String,
 		Password: user.Password,
+		Phone:    user.Phone.String,
+		Nickname: user.Nickname,
+		// UTC 0的毫秒 -> time
+		Birthday: time.UnixMilli(user.Birthday),
+		Resume:   user.Resume,
+		// UTC 0的毫秒 -> time
+		Ctime: time.UnixMilli(user.Ctime),
 	}
 }
