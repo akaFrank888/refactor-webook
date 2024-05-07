@@ -1,9 +1,10 @@
-package dao
+package ioc
 
 import (
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"refactor-webook/webook/internal/repository/dao"
 )
 
 func InitDB() *gorm.DB {
@@ -25,7 +26,7 @@ func InitDB() *gorm.DB {
 	}
 
 	// 迁移 schema
-	err = db.AutoMigrate(&User{})
+	err = dao.InitTables(db)
 	if err != nil {
 		panic("failed to migrate database")
 	}

@@ -13,6 +13,10 @@ import (
 type LoginJWTMiddleWareBuilder struct {
 }
 
+func NewLoginJWTMiddleWareBuilder() *LoginJWTMiddleWareBuilder {
+	return &LoginJWTMiddleWareBuilder{}
+}
+
 func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		path := ctx.Request.URL.Path

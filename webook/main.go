@@ -1,88 +1,20 @@
 package main
 
 import (
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	redis_contrib "github.com/gin-contrib/sessions/redis"
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
-	"refactor-webook/webook/internal/repository"
-	"refactor-webook/webook/internal/repository/cache"
-	"refactor-webook/webook/internal/repository/dao"
-	"refactor-webook/webook/internal/service"
-	"refactor-webook/webook/internal/service/localsms"
-	"refactor-webook/webook/internal/web"
-	"refactor-webook/webook/internal/web/middleware"
-	"strings"
-	"time"
-
 	"github.com/gin-gonic/gin"
+	"net/http"
+	"refactor-webook/webook/internal/web/middleware"
 )
 
 func main() {
+	server := InitWebServer()
+	server.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "hello，启动成功")
+	})
+	server.Run(":8080")
 
-	db := dao.InitDB()
-	cmd := cache.InitRedis()
-	server := initWebServer()
-	initUserHdl(db, cmd, server)
-
-	server.Run(":8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
-}
-
-func initWebServer() *gin.Engine {
-	server := gin.Default()
-
-	// note middleware的本质是 HandlerFunc
-	server.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:3000"},
-		// AllowMethods:     []string{"PUT", "PATCH"},
-		// note JWT的跨域设置：AllowHeaders 和 ExposeHeaders
-		// note authorization中的“Bear ***”
-		AllowHeaders: []string{"authorization", "content-type"},
-		// note 允许前端访问后端的响应中自定义的header
-		ExposeHeaders:    []string{"x-jwt-token"},
-		AllowCredentials: true,
-		AllowOriginFunc: func(origin string) bool {
-			if strings.HasPrefix(origin, "http://localhost") {
-				return true
-			}
-			return strings.Contains(origin, "your_company.com")
-		},
-		MaxAge: 12 * time.Hour,
-	}),
-		func(ctx *gin.Context) {
-			println("第一个middleware")
-		},
-		func(ctx *gin.Context) {
-			println("第二个middleware")
-		})
-
-	useJWT(server) // note 被代替的方法：useSession(server)
-
-	return server
-}
-
-func initUserHdl(db *gorm.DB, cmd redis.Cmdable, server *gin.Engine) {
-	userService := initUserService(db, cmd)
-	codeService := initCodeService(cmd)
-
-	h := web.NewUserHandler(userService, codeService)
-	h.RegisterRoutes(server)
-}
-
-func initUserService(db *gorm.DB, cmd redis.Cmdable) service.UserService {
-	userDao := dao.NewUserDao(db)
-	userCache := cache.NewUserCache(cmd)
-	userRepository := repository.NewUserRepository(userDao, userCache)
-	userService := service.NewUserService(userRepository)
-	return userService
-}
-
-func initCodeService(cmd redis.Cmdable) service.CodeService {
-	codeCache := cache.NewCodeCache(cmd)
-	codeRepo := repository.NewCodeRepository(codeCache)
-	// localsms.NewService() 是本地实现的sms，用于测试而已
-	return service.NewCodeService(codeRepo, localsms.NewService())
 }
 
 func useJWT(server *gin.Engine) {
