@@ -61,7 +61,8 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	}
 	var req Req
 	if err := ctx.Bind(&req); err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		// note Bind出错，返回的是400
+		ctx.JSON(http.StatusBadRequest, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -78,6 +79,8 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	// 2. 校验邮箱和密码的正则
 	isEmail, err := h.emailRexExp.MatchString(req.Email)
 	if err != nil {
+		// 如果正则表达式本身没有错的话，是不会进入这个分支的（除非别的同事篡改）
+		// note 所以单元测试，测不了这个err分支，只能测到下面 if !isEmail 这个分支
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
