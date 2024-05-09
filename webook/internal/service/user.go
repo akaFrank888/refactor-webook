@@ -44,9 +44,12 @@ func (svc *userService) SignUp(ctx context.Context, user domain.User) error {
 func (svc *userService) Login(ctx context.Context, email, password string) (domain.User, error) {
 
 	user, err := svc.repo.FindByEmail(ctx, email)
-	if err != nil {
-		// note 注意：不管是用户没找到，还是密码错误，都返回同一个err
+	if err == repository.ErrUserNotFound {
+		// note 注意：不管是email没找到，还是下面的密码错误，都返回同一个err
 		return domain.User{}, ErrInvalidEmailOrPassword
+	}
+	if err != nil {
+		return domain.User{}, err
 	}
 	// 核对密码 参数分别是：加密后的密码 和 输入的明文密码
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
