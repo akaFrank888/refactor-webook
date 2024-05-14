@@ -20,6 +20,7 @@ type UserRepository interface {
 	FindById(ctx context.Context, id int64) (domain.User, error)
 	UpdateNonZeroFields(ctx context.Context, user domain.User) error
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
+	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
 type CacheDUserRepository struct {
@@ -103,6 +104,14 @@ func (repo *CacheDUserRepository) FindByPhone(ctx context.Context, phone string)
 	return toDomain(user), nil
 }
 
+func (repo *CacheDUserRepository) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
+	user, err := repo.dao.FindByOpenId(ctx, openId)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return toDomain(user), nil
+}
+
 func toPersistent(user domain.User) dao.User {
 	return dao.User{
 		Id: user.Id,
@@ -118,6 +127,14 @@ func toPersistent(user domain.User) dao.User {
 		Nickname: user.Nickname,
 		Birthday: user.Birthday.UnixMilli(),
 		Resume:   user.Resume,
+		WechatUnionId: sql.NullString{
+			String: user.WechatInfo.UnionId,
+			Valid:  user.WechatInfo.UnionId != "",
+		},
+		WechatOpenId: sql.NullString{
+			String: user.WechatInfo.OpenId,
+			Valid:  user.WechatInfo.OpenId != "",
+		},
 	}
 
 }
@@ -134,5 +151,9 @@ func toDomain(user dao.User) domain.User {
 		Resume:   user.Resume,
 		// UTC 0的毫秒 -> time
 		Ctime: time.UnixMilli(user.Ctime),
+		WechatInfo: domain.WechatInfo{
+			OpenId:  user.WechatOpenId.String,
+			UnionId: user.WechatUnionId.String,
+		},
 	}
 }

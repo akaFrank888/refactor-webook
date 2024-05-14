@@ -18,6 +18,7 @@ type UserService interface {
 	FindById(ctx context.Context, uid int64) (domain.User, error)
 	UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error)
 }
 
 // 避免与接口同名，所以小写首字母
@@ -85,4 +86,21 @@ func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.
 	}
 	// TODO 主从延迟 ==>插入进的是主库，查询查的是从库，所以可能刚插进去就查的话查不到，因为主从库还没同步完成【解决方式是强制查主库，但还没做】
 	return svc.repo.FindByPhone(ctx, phone)
+}
+
+func (svc *userService) FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error) {
+	u, err := svc.repo.FindByWechat(ctx, info.OpenId)
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+	// 新用户
+	err = svc.repo.Create(ctx, domain.User{
+		WechatInfo: info,
+	})
+	if err != nil && err != repository.ErrDuplicateUser {
+		// note 仅因系统错误（排除攻击者造成的并发问题导致的err）
+		return domain.User{}, err
+	}
+	// TODO 主从延迟 ==>插入进的是主库，查询查的是从库，所以可能刚插进去就查的话查不到，因为主从库还没同步完成【解决方式是强制查主库，但还没做】
+	return svc.repo.FindByWechat(ctx, info.OpenId)
 }

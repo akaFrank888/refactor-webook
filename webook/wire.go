@@ -16,15 +16,17 @@ import (
 func InitWebServer() *gin.Engine {
 	wire.Build(
 		// 第三方依赖
-		ioc.InitDB, ioc.InitRedis, ioc.InitSMSService,
+		ioc.InitDB, ioc.InitRedis,
 		// dao和cache
 		dao.NewUserDao, cache.NewUserCache, cache.NewCodeCache,
 		// repo
 		repository.NewUserRepository, repository.NewCodeRepository,
 		// service
-		service.NewUserService, service.NewCodeService,
+		ioc.InitSMSService, service.NewUserService, service.NewCodeService,
+		ioc.InitWechatService,
+
 		// handler
-		web.NewUserHandler,
+		web.NewUserHandler, web.NewOAuth2WechatHandler,
 
 		// gin的中间件
 		ioc.InitGinMiddlewares,

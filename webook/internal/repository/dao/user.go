@@ -20,6 +20,7 @@ type UserDao interface {
 	FindById(ctx context.Context, id int64) (User, error)
 	UpdateById(ctx context.Context, user User) error
 	FindByPhone(ctx context.Context, phone string) (User, error)
+	FindByOpenId(ctx context.Context, openId string) (User, error)
 }
 
 func (dao *GormUserDao) FindById(ctx context.Context, id int64) (User, error) {
@@ -75,6 +76,13 @@ func (dao *GormUserDao) FindByPhone(ctx context.Context, phone string) (User, er
 	return user, err
 }
 
+func (dao *GormUserDao) FindByOpenId(ctx context.Context, openId string) (User, error) {
+	var user User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id = ?", openId).First(&user).Error
+
+	return user, err
+}
+
 type User struct {
 	Id int64 `gorm:"primary_key, autoIncrement"`
 	// note 可为null，因为可以不用email注册，而用手机号
@@ -89,4 +97,11 @@ type User struct {
 	Nickname string `gorm:"type=varchar(20)"`
 	Birthday int64
 	Resume   string `gorm:"type=varchar(200)"`
+
+	// note
+	// 1 如果查询要求同时使用 openid 和 unionid，就要创建联合唯一索引
+	// 2 如果查询只用 openid，那么就在 openid 上创建唯一索引，或者 <openid, unionId> 联合索引
+	// 3 如果查询只用 unionid，那么就在 unionid 上创建唯一索引，或者 <unionid, openid> 联合索引
+	WechatOpenId  sql.NullString `gorm:"unique"`
+	WechatUnionId sql.NullString
 }

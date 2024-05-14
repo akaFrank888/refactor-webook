@@ -50,9 +50,25 @@
 
 
 ### week5
+（1）学习内容：
+1. 单元测试
+
+（2）待办
+1. 集成测试
+2. 第五周作业
+
+### week6 
+
+（1）学习内容：
+1. oauth2原理
+<img src="image/week6_oauth2.jpg">
+2. 在handler层面上对比state，防止跨站伪造请求攻击
+3. 每次添加新的handler，需要做的更改：
+   1) middleware中登录校验的白名单url
+   2) ioc
+   3) wire
 
 
 
 
-
-### week6  （记得新建branch）
+### week7  （记得新建branch）
