@@ -4,6 +4,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
@@ -50,6 +51,8 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/login", h.LoginJWT)
 	g.GET("/profile", h.profile)
 	g.POST("/edit", h.edit)
+	g.POST("/refresh_token", h.RefreshToken)
+
 	g.POST("/login_sms/code/send", h.SendSMSLoginCode)
 	g.POST("/login_sms", h.LoginSMS)
 }
@@ -148,7 +151,13 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	user, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		h.setJWTToken(ctx, user.Id)
+		err := h.setJWTToken(ctx, user.Id)
+		if err != nil {
+			ctx.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
+		}
 		ctx.JSON(http.StatusOK, Result{
 			Data: user,
 			Msg:  "登录成功",
@@ -386,9 +395,49 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 		})
 	}
 	// 登录成功后，设置JWT
-	h.setJWTToken(ctx, u.Id)
+	err = h.setJWTToken(ctx, u.Id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "登录成功",
 	})
 
+}
+
+func (h *UserHandler) RefreshToken(ctx *gin.Context) {
+	// note 约定：前端在请求刷新短token时，会将refresh_token放在Authorization中
+	refreshTokenStr := ExtractToken(ctx)
+	var rc RefreshClaims
+	token, err := jwt.ParseWithClaims(refreshTokenStr, &rc, func(token *jwt.Token) (interface{}, error) {
+		return RefreshKey, nil
+	})
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, Result{
+			Code: 4,
+			Msg:  "refresh_token无效",
+		})
+	}
+	if token == nil || !token.Valid {
+		ctx.JSON(http.StatusUnauthorized, Result{
+			Code: 4,
+			Msg:  "refresh_token无效",
+		})
+	}
+
+	err = h.setJWTToken(ctx, rc.Uid)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "刷新成功",
+	})
 }

@@ -27,7 +27,7 @@ func InitGinMiddlewares() []gin.HandlerFunc {
 			// note authorization中的“Bear ***”
 			AllowHeaders: []string{"authorization", "content-type"},
 			// note 允许前端访问后端的响应中自定义的header
-			ExposeHeaders:    []string{"x-jwt-token"},
+			ExposeHeaders:    []string{"x-jwt-token", "x-refresh-token"},
 			AllowCredentials: true,
 			AllowOriginFunc: func(origin string) bool {
 				if strings.HasPrefix(origin, "http://localhost") {

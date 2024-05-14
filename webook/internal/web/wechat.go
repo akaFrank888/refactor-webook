@@ -85,7 +85,13 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 			Msg:  "wechat注册或登录失败",
 		})
 	}
-	h.setJWTToken(ctx, u.Id)
+	err = h.setJWTToken(ctx, u.Id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "设置jwt失败",
+		})
+	}
 
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "登录成功",
