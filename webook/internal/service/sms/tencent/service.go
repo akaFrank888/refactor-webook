@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	tencentSMS "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111" // 引入sms
+	"go.uber.org/zap"
 	"refactor-webook/webook/internal/service/sms"
 )
 
@@ -32,6 +33,12 @@ func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers
 	request.TemplateParamSet = common.StringPtrs(args)
 	request.PhoneNumberSet = common.StringPtrs(numbers)
 	response, err := s.client.SendSms(request)
+
+	// note 研发环境经常用 debug 日志，线上环境不用
+	zap.L().Debug("请求腾讯的SendSMS接口",
+		zap.Any("request", request),
+		zap.Any("response", response))
+
 	if err != nil {
 		fmt.Printf("An API error has returned: %s", err)
 		return err

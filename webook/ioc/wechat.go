@@ -3,9 +3,10 @@ package ioc
 import (
 	"os"
 	"refactor-webook/webook/internal/service/oauth2/wechat"
+	"refactor-webook/webook/pkg/logger"
 )
 
-func InitWechatService() wechat.Service {
+func InitWechatService(l logger.LoggerV1) wechat.Service {
 	// 从环境变量中取出 appid （因为appid是敏感信息，所以放在环境变量或配置文件中）
 	// os.getenv("WECHAT_APP_ID")是假设一定有这个环境变量
 
@@ -18,5 +19,5 @@ func InitWechatService() wechat.Service {
 	if !ok {
 		// panic("找不到环境变量WECHAT_APP_SECRET")
 	}
-	return wechat.NewService(appID, appSecret)
+	return wechat.NewService(appID, appSecret, l)
 }

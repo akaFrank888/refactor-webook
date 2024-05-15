@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"refactor-webook/webook/internal/domain"
+	"refactor-webook/webook/pkg/logger"
 )
 
 type Service interface {
@@ -19,13 +20,15 @@ type service struct {
 	AppSecret string
 	// 发送http请求的client
 	client *http.Client
+	l      logger.LoggerV1
 }
 
-func NewService(appId, appSecret string) Service {
+func NewService(appId, appSecret string, l logger.LoggerV1) Service {
 	return &service{
 		AppId:     appId,
 		AppSecret: appSecret,
 		client:    http.DefaultClient,
+		l:         l,
 	}
 }
 

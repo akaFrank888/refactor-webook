@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository"
@@ -94,6 +95,8 @@ func (svc *userService) FindOrCreateByWechat(ctx context.Context, info domain.We
 		return u, err
 	}
 	// 新用户
+	zap.L().Info("新用户", zap.Any("wechatInfo", info))
+
 	err = svc.repo.Create(ctx, domain.User{
 		WechatInfo: info,
 	})

@@ -1,11 +1,13 @@
 package ioc
 
 import (
+	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"refactor-webook/webook/internal/web"
 	ijwt "refactor-webook/webook/internal/web/jwt"
 	"refactor-webook/webook/internal/web/middleware"
+	"refactor-webook/webook/pkg/logger"
 	"strings"
 	"time"
 )
@@ -19,7 +21,7 @@ func InitWebServer(funcs []gin.HandlerFunc, userHdl *web.UserHandler, wechatHdl 
 	return server
 }
 
-func InitGinMiddlewares(hdl ijwt.Handler) []gin.HandlerFunc {
+func InitGinMiddlewares(hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},
@@ -44,6 +46,10 @@ func InitGinMiddlewares(hdl ijwt.Handler) []gin.HandlerFunc {
 		func(ctx *gin.Context) {
 			println("第二个middleware")
 		},
+		middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
+			l.Debug("", logger.Field{Key: "req", Val: al})
+		}).AllowReqBody().AllowRespBody().Build(),
+
 		// JWT
 		middleware.NewLoginJWTMiddleWareBuilder(hdl).CheckLogin(),
 	}

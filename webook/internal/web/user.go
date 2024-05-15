@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 	"net/http"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
@@ -354,6 +355,7 @@ func (h *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 			Code: 4,
 			Msg:  "发送太频繁",
 		})
+		zap.L().Warn("频繁发送验证码")
 	default:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -382,6 +384,8 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 			Code: 5,
 			Msg:  "系统错误",
 		})
+		// note 生产环境不能用户手机号，开发环境可以打（因为是公司提供的测试手机号）
+		zap.L().Error("用户手机号码登录失败", zap.Error(err), zap.String("phone", req.Phone))
 	}
 	if !ok {
 		ctx.JSON(http.StatusOK, Result{
