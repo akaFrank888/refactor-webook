@@ -1,13 +1,16 @@
 package middleware
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"net/http"
 	"refactor-webook/webook/internal/web"
 )
 
 type LoginJWTMiddleWareBuilder struct {
+	cmd redis.Cmdable
 }
 
 func NewLoginJWTMiddleWareBuilder() *LoginJWTMiddleWareBuilder {
@@ -65,6 +68,17 @@ func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 			}
 
 		*/
+
+		// note 退出登录的校验：检查 redis 中是否有ssid
+		cnt, err := b.cmd.Exists(ctx, fmt.Sprintf("user:ssid:%s", uc.Ssid)).Result()
+
+		// note 这种写法过于生硬，因为若redis崩了，正常登录着的用户也会无法通过这个判断导致返回401【可不处理err来降级处理，以兼容redis异常的情况】
+		// note 要保证尽量提供服务，即使是有损的服务也比没服务好
+		if err != nil || cnt > 0 {
+			// redis有问题 或 已退出登录
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
 
 		// note 三、保存uc到ctx中
 		ctx.Set("user", uc)

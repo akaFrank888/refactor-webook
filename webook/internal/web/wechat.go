@@ -11,7 +11,7 @@ import (
 )
 
 type OAuth2WechatHandler struct {
-	jwtHandler
+	JwtHandler
 	svc     wechat.Service
 	userSvc service.UserService
 
@@ -85,7 +85,7 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 			Msg:  "wechat注册或登录失败",
 		})
 	}
-	err = h.setJWTToken(ctx, u.Id)
+	err = h.SetLoginToken(ctx, u.Id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,

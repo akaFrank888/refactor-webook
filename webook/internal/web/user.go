@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ const (
 )
 
 type UserHandler struct {
-	jwtHandler
+	JwtHandler
 
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
@@ -49,6 +50,7 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/signup", h.SignUp)
 	//g.POST("/login", h.Login)
 	g.POST("/login", h.LoginJWT)
+	g.POST("/logout", h.LogoutJWT)
 	g.GET("/profile", h.profile)
 	g.POST("/edit", h.edit)
 	g.POST("/refresh_token", h.RefreshToken)
@@ -151,7 +153,7 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	user, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		err := h.setJWTToken(ctx, user.Id)
+		err := h.SetLoginToken(ctx, user.Id)
 		if err != nil {
 			ctx.JSON(http.StatusOK, Result{
 				Code: 5,
@@ -395,7 +397,7 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 		})
 	}
 	// 登录成功后，设置JWT
-	err = h.setJWTToken(ctx, u.Id)
+	err = h.SetLoginToken(ctx, u.Id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -421,23 +423,47 @@ func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 			Code: 4,
 			Msg:  "refresh_token无效",
 		})
+		return
 	}
 	if token == nil || !token.Valid {
 		ctx.JSON(http.StatusUnauthorized, Result{
 			Code: 4,
 			Msg:  "refresh_token无效",
 		})
+		return
 	}
 
-	err = h.setJWTToken(ctx, rc.Uid)
+	cnt, err := h.client.Exists(ctx, fmt.Sprintf("user:ssid:%s", rc.Ssid)).Result()
+	if err != nil || cnt > 0 {
+		// redis有问题 或 已退出登录
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	err = h.setJWTToken(ctx, rc.Uid, rc.Ssid)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
+		return
 	}
 
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "刷新成功",
+	})
+}
+
+func (h *UserHandler) LogoutJWT(ctx *gin.Context) {
+	err := h.ClearToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "退出登录成功",
 	})
 }
