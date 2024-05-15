@@ -10,6 +10,7 @@ import (
 	"refactor-webook/webook/internal/repository/dao"
 	"refactor-webook/webook/internal/service"
 	"refactor-webook/webook/internal/web"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 	"refactor-webook/webook/ioc"
 )
 
@@ -27,6 +28,7 @@ func InitWebServer() *gin.Engine {
 
 		// handler
 		web.NewUserHandler, web.NewOAuth2WechatHandler,
+		ijwt.NewRedisJWTHandler,
 
 		// gin的中间件
 		ioc.InitGinMiddlewares,

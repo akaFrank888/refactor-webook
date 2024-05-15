@@ -1,20 +1,20 @@
 package middleware
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 	"net/http"
-	"refactor-webook/webook/internal/web"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 )
 
 type LoginJWTMiddleWareBuilder struct {
-	cmd redis.Cmdable
+	ijwt.Handler
 }
 
-func NewLoginJWTMiddleWareBuilder() *LoginJWTMiddleWareBuilder {
-	return &LoginJWTMiddleWareBuilder{}
+func NewLoginJWTMiddleWareBuilder(hdl ijwt.Handler) *LoginJWTMiddleWareBuilder {
+	return &LoginJWTMiddleWareBuilder{
+		Handler: hdl,
+	}
 }
 
 func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
@@ -29,12 +29,12 @@ func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 			return
 		}
 		// 一、JTW的登录校验：解析JWT
-		tokenStr := web.ExtractToken(ctx)
+		tokenStr := b.ExtractToken(ctx)
 
-		uc := web.UserClaims{}
+		uc := ijwt.UserClaims{}
 		// note 1. keyfunc的作用是生成更高级的JWTKey，但我们不需要对key设计func，用固定的即可。 2. &uc不是uc
 		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (interface{}, error) {
-			return web.JWTKey, nil
+			return ijwt.JWTKey, nil
 		})
 		if err != nil {
 			// token解析不出来（可能是伪造的）
@@ -69,12 +69,9 @@ func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 
 		*/
 
-		// note 退出登录的校验：检查 redis 中是否有ssid
-		cnt, err := b.cmd.Exists(ctx, fmt.Sprintf("user:ssid:%s", uc.Ssid)).Result()
-
-		// note 这种写法过于生硬，因为若redis崩了，正常登录着的用户也会无法通过这个判断导致返回401【可不处理err来降级处理，以兼容redis异常的情况】
-		// note 要保证尽量提供服务，即使是有损的服务也比没服务好
-		if err != nil || cnt > 0 {
+		// 退出登录的校验
+		err = b.CheckSsid(ctx, uc.Ssid)
+		if err != nil {
 			// redis有问题 或 已退出登录
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return

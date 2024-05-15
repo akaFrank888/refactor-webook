@@ -4,6 +4,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"refactor-webook/webook/internal/web"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 	"refactor-webook/webook/internal/web/middleware"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ func InitWebServer(funcs []gin.HandlerFunc, userHdl *web.UserHandler, wechatHdl 
 	return server
 }
 
-func InitGinMiddlewares() []gin.HandlerFunc {
+func InitGinMiddlewares(hdl ijwt.Handler) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},
@@ -44,7 +45,7 @@ func InitGinMiddlewares() []gin.HandlerFunc {
 			println("第二个middleware")
 		},
 		// JWT
-		middleware.NewLoginJWTMiddleWareBuilder().CheckLogin(),
+		middleware.NewLoginJWTMiddleWareBuilder(hdl).CheckLogin(),
 	}
 
 }

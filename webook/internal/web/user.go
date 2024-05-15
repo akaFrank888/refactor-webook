@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 	"time"
 )
 
@@ -23,7 +23,7 @@ const (
 )
 
 type UserHandler struct {
-	JwtHandler
+	ijwt.Handler
 
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
@@ -32,7 +32,7 @@ type UserHandler struct {
 	codeSvc service.CodeService
 }
 
-func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService, hdl ijwt.Handler) *UserHandler {
 	return &UserHandler{
 		// note 预编译正则表达式来提高校验速度
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
@@ -40,6 +40,8 @@ func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserH
 
 		svc:     svc,
 		codeSvc: codeSvc,
+
+		Handler: hdl,
 	}
 }
 
@@ -236,7 +238,7 @@ func (h *UserHandler) profile(ctx *gin.Context) {
 
 	// 方式二：从jwt中取uid
 	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
-	uc := ctx.MustGet("user").(UserClaims)
+	uc := ctx.MustGet("user").(ijwt.UserClaims)
 	userId := uc.Uid
 
 	u, err := h.svc.FindById(ctx, userId)
@@ -273,7 +275,7 @@ func (h *UserHandler) edit(ctx *gin.Context) {
 
 	// 方式二：从jwt中取uid
 	// note ctx.get("user")还得判断ok才能类型断言，所以用MustGet()
-	uc := ctx.MustGet("user").(UserClaims)
+	uc := ctx.MustGet("user").(ijwt.UserClaims)
 	userId := uc.Uid
 
 	type Req struct {
@@ -413,10 +415,10 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 
 func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 	// note 约定：前端在请求刷新短token时，会将refresh_token放在Authorization中
-	refreshTokenStr := ExtractToken(ctx)
-	var rc RefreshClaims
+	refreshTokenStr := h.ExtractToken(ctx)
+	var rc ijwt.RefreshClaims
 	token, err := jwt.ParseWithClaims(refreshTokenStr, &rc, func(token *jwt.Token) (interface{}, error) {
-		return RefreshKey, nil
+		return ijwt.RefreshKey, nil
 	})
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, Result{
@@ -433,14 +435,14 @@ func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	cnt, err := h.client.Exists(ctx, fmt.Sprintf("user:ssid:%s", rc.Ssid)).Result()
-	if err != nil || cnt > 0 {
+	err = h.CheckSsid(ctx, rc.Ssid)
+	if err != nil {
 		// redis有问题 或 已退出登录
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	err = h.setJWTToken(ctx, rc.Uid, rc.Ssid)
+	err = h.SetJWTToken(ctx, rc.Uid, rc.Ssid)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,

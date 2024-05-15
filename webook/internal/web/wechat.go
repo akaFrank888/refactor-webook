@@ -8,21 +8,24 @@ import (
 	"net/http"
 	"refactor-webook/webook/internal/service"
 	"refactor-webook/webook/internal/service/oauth2/wechat"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 )
 
 type OAuth2WechatHandler struct {
-	JwtHandler
+	ijwt.Handler
 	svc     wechat.Service
 	userSvc service.UserService
 
 	stateCookieName string
 }
 
-func NewOAuth2WechatHandler(svc wechat.Service, userSvc service.UserService) *OAuth2WechatHandler {
+func NewOAuth2WechatHandler(svc wechat.Service, userSvc service.UserService, hdl ijwt.Handler) *OAuth2WechatHandler {
 	return &OAuth2WechatHandler{
 		svc:             svc,
 		userSvc:         userSvc,
 		stateCookieName: "jwt-state",
+
+		Handler: hdl,
 	}
 }
 
@@ -103,7 +106,7 @@ func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) err
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, StateClaims{
 		State: state,
 	})
-	tokenStr, err := token.SignedString(JWTKey)
+	tokenStr, err := token.SignedString(ijwt.JWTKey)
 	if err != nil {
 		return err
 	}
@@ -122,7 +125,7 @@ func (h *OAuth2WechatHandler) verifyState(ctx *gin.Context) error {
 	}
 	var sc StateClaims
 	_, err = jwt.ParseWithClaims(tokenStr, &sc, func(token *jwt.Token) (any, error) {
-		return JWTKey, nil
+		return ijwt.JWTKey, nil
 	})
 	if err != nil {
 		return errors.New("cookie不是合法的jwt token")
