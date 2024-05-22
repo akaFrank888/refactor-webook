@@ -13,13 +13,14 @@ import (
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
 	svcmocks "refactor-webook/webook/internal/service/mocks"
+	ijwt "refactor-webook/webook/internal/web/jwt"
 	"testing"
 )
 
 func TestUserHandler_SignUp(t *testing.T) {
 	testCases := []struct {
 		name string
-		mock func(ctrl *gomock.Controller) (service.UserService, service.CodeService)
+		mock func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler)
 		// 预期中的输入
 		reqBuilder func(t *testing.T) *http.Request
 		// 预期中的输出
@@ -30,7 +31,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 		// note 先测试正常的流程（最长的流程），再考虑异常流程
 		{
 			name: "注册成功",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				userSvc := svcmocks.NewMockUserService(ctrl)
 				userSvc.EXPECT().SignUp(gomock.Any(), domain.User{
 					Email:    "123@qq.com",
@@ -39,7 +40,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				// note CodeSvc没有用到的话，也可以直接写nil
 				// return userSvc, nil
 				codeSvc := svcmocks.NewMockCodeService(ctrl)
-				return userSvc, codeSvc
+				return userSvc, codeSvc, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -56,9 +57,9 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "非JSON输入",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				// 还执行不到svc，所以直接设为nil
-				return nil, nil
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -77,9 +78,9 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "两次密码不一致",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				// 还执行不到svc，所以直接设为nil
-				return nil, nil
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -98,9 +99,9 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "邮箱格式不正确",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				// 还执行不到svc，所以直接设为nil
-				return nil, nil
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -118,9 +119,9 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "密码格式不正确",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				// 还执行不到svc，所以直接设为nil
-				return nil, nil
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -138,7 +139,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "注册的邮箱已存在",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				userSvc := svcmocks.NewMockUserService(ctrl)
 				userSvc.EXPECT().SignUp(gomock.Any(), domain.User{
 					Email:    "123@qq.com",
@@ -146,7 +147,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 					// note 要返回邮箱冲突的特定错误
 				}).Return(service.ErrDuplicateUser)
 				codeSvc := svcmocks.NewMockCodeService(ctrl)
-				return userSvc, codeSvc
+				return userSvc, codeSvc, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -164,7 +165,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 		},
 		{
 			name: "系统错误",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler) {
 				userSvc := svcmocks.NewMockUserService(ctrl)
 				userSvc.EXPECT().SignUp(gomock.Any(), domain.User{
 					Email:    "123@qq.com",
@@ -173,7 +174,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				// note CodeSvc没有用到的话，也可以直接写nil
 				// return userSvc, nil
 				codeSvc := svcmocks.NewMockCodeService(ctrl)
-				return userSvc, codeSvc
+				return userSvc, codeSvc, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewReader(
@@ -198,9 +199,9 @@ func TestUserHandler_SignUp(t *testing.T) {
 			defer ctrl.Finish()
 
 			// 利用mock构造svc
-			userSvc, codeSvc := tc.mock(ctrl)
+			userSvc, codeSvc, jwtHdl := tc.mock(ctrl)
 			// 构造hdl
-			hdl := NewUserHandler(userSvc, codeSvc)
+			hdl := NewUserHandler(userSvc, codeSvc, jwtHdl)
 			// 准备服务器和注册路由
 			server := gin.Default()
 			hdl.RegisterRoutes(server)
@@ -250,7 +251,7 @@ func TestEmailPattern(t *testing.T) {
 		},
 	}
 
-	h := NewUserHandler(nil, nil)
+	h := NewUserHandler(nil, nil, nil)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

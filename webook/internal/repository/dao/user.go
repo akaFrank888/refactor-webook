@@ -61,12 +61,19 @@ func (dao *GormUserDao) FindByEmail(ctx context.Context, email string) (User, er
 }
 
 func (dao *GormUserDao) UpdateById(ctx context.Context, user User) error {
-	return dao.db.WithContext(ctx).Model(&user).Where("id=?", user.Id).Updates(map[string]any{
+	res := dao.db.WithContext(ctx).Model(&user).Where("id=?", user.Id).Updates(map[string]any{
 		"utime":    time.Now().UnixMilli(), // 更新时间
 		"nickname": user.Nickname,
 		"birthday": user.Birthday,
 		"resume":   user.Resume,
-	}).Error
+	})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.New("id错误，更新失败")
+	}
+	return nil
 }
 
 func (dao *GormUserDao) FindByPhone(ctx context.Context, phone string) (User, error) {

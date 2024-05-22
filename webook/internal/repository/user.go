@@ -36,7 +36,7 @@ func NewUserRepository(dao dao.UserDao, cache cache.UserCache) UserRepository {
 }
 
 func (repo *CacheDUserRepository) Create(ctx context.Context, user domain.User) error {
-	return repo.dao.Insert(ctx, toPersistent(user))
+	return repo.dao.Insert(ctx, repo.toPersistent(user))
 }
 
 func (repo *CacheDUserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
@@ -44,7 +44,7 @@ func (repo *CacheDUserRepository) FindByEmail(ctx context.Context, email string)
 	if err != nil {
 		return domain.User{}, err
 	}
-	return toDomain(user), nil
+	return repo.toDomain(user), nil
 }
 
 // FindById 先从Cache中找，再查dao层的数据库（，再回写缓存）
@@ -61,7 +61,7 @@ func (repo *CacheDUserRepository) FindById(ctx context.Context, id int64) (domai
 
 	// note cache未命中 ==》查dao层，回写缓存
 	u, err := repo.dao.FindById(ctx, id)
-	user = toDomain(u)
+	user = repo.toDomain(u)
 
 	if err != nil {
 		return domain.User{}, err
@@ -85,7 +85,7 @@ func (repo *CacheDUserRepository) FindById(ctx context.Context, id int64) (domai
 
 func (repo *CacheDUserRepository) UpdateNonZeroFields(ctx context.Context, user domain.User) error {
 	// 先更新DB，后更新cache
-	err := repo.dao.UpdateById(ctx, toPersistent(user))
+	err := repo.dao.UpdateById(ctx, repo.toPersistent(user))
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (repo *CacheDUserRepository) FindByPhone(ctx context.Context, phone string)
 	if err != nil {
 		return domain.User{}, err
 	}
-	return toDomain(user), nil
+	return repo.toDomain(user), nil
 }
 
 func (repo *CacheDUserRepository) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
@@ -109,10 +109,10 @@ func (repo *CacheDUserRepository) FindByWechat(ctx context.Context, openId strin
 	if err != nil {
 		return domain.User{}, err
 	}
-	return toDomain(user), nil
+	return repo.toDomain(user), nil
 }
 
-func toPersistent(user domain.User) dao.User {
+func (repo *CacheDUserRepository) toPersistent(user domain.User) dao.User {
 	return dao.User{
 		Id: user.Id,
 		Email: sql.NullString{
@@ -135,11 +135,12 @@ func toPersistent(user domain.User) dao.User {
 			String: user.WechatInfo.OpenId,
 			Valid:  user.WechatInfo.OpenId != "",
 		},
+		// note 不需要设置Ctime和Utime，因为在dao层会进行设置
 	}
 
 }
 
-func toDomain(user dao.User) domain.User {
+func (repo *CacheDUserRepository) toDomain(user dao.User) domain.User {
 	return domain.User{
 		Id:       user.Id,
 		Email:    user.Email.String,
