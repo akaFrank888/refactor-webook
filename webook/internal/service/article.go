@@ -16,7 +16,7 @@ type ArticleService interface {
 type articleService struct {
 	repo repository.ArticleRepository
 
-	// V1 写法专用
+	// V1 写法专用  ————  在Service层同步制作库和线上库的数据（完成分发）
 	authorRepo repository.ArticleAuthorRepository
 	readerRepo repository.ArticleReaderRepository
 	l          logger.LoggerV1
@@ -52,10 +52,10 @@ func (svc *articleService) Update(ctx context.Context, article domain.Article) e
 }
 
 func (svc *articleService) Publish(ctx context.Context, article domain.Article) (int64, error) {
-	return svc.repo.Create(ctx, article)
+	return svc.repo.Sync(ctx, article)
 }
 
-// PublishV1 note 1. 先新建/更新到“操作库”，再保存到“线上库” 2. 约定 : 操作库喝线上库的帖子 id 是相同的
+// PublishV1 note 1.【在service层完成“发表”中制作库和线上库的分发或者叫同步】先新建/更新到“操作库”，再保存到“线上库” 2. 约定 : 操作库喝线上库的帖子 id 是相同的
 func (svc *articleService) PublishV1(ctx context.Context, article domain.Article) (int64, error) {
 	var (
 		id  = article.Id
