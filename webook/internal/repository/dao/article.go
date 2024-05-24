@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -12,6 +13,7 @@ type ArticleDao interface {
 	Insert(ctx context.Context, article Article) (int64, error)
 	UpdateById(ctx context.Context, article Article) error
 	Sync(ctx context.Context, article Article) (int64, error)
+	SyncStatus(ctx *gin.Context, uid int64, aid int64, status uint8) error
 }
 
 type GormArticleDao struct {
@@ -40,6 +42,7 @@ func (dao *GormArticleDao) UpdateById(ctx context.Context, article Article) erro
 	res := dao.db.WithContext(ctx).Model(&Article{}).Where("id = ? and author_id = ?", article.Id, article.AuthorId).Updates(map[string]any{
 		"title":   article.Title,
 		"content": article.Content,
+		"status":  article.Status,
 		"utime":   now,
 	})
 	if res.Error != nil {
@@ -80,11 +83,38 @@ func (dao *GormArticleDao) Sync(ctx context.Context, article Article) (int64, er
 				"title":   pubArticle.Title,
 				"content": pubArticle.Content,
 				"utime":   now,
+				"status":  pubArticle.Status,
 			}),
 		}).Create(&pubArticle).Error
 		return err
 	})
 	return id, err
+}
+
+func (dao *GormArticleDao) SyncStatus(ctx *gin.Context, uid int64, aid int64, status uint8) error {
+	now := time.Now().UnixMilli()
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// updates 语句需要接收res来判断是否更新成功
+		res := tx.Model(&Article{}).
+			Where("id = ? and author_id = ?", aid, uid).
+			Updates(map[string]any{
+				"status": status,
+				"utime":  now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return errors.New("文章id或者作者id有误，更新失败")
+		}
+		// 再更新线上库的status
+		return tx.Model(&PublishedArticle{}).
+			Where("id = ?", uid).
+			Updates(map[string]any{
+				"utime":  now,
+				"status": status,
+			}).Error
+	})
 }
 
 func (dao *GormArticleDao) SyncV1(ctx context.Context, article Article) (int64, error) {
@@ -148,6 +178,8 @@ type Article struct {
 	AuthorId int64 `gorm:"index"`
 	Ctime    int64
 	Utime    int64
+
+	Status uint8
 }
 
 // PublishedArticle 衍生类型，为了在“repo层将制作库和线上库进行分发，且两库满足同库不同表，采用事务处理”时，PublishedArticle代表读者读取的表

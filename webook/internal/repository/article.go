@@ -2,17 +2,18 @@ package repository
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
-	"time"
 )
 
 type ArticleRepository interface {
 	Create(ctx context.Context, article domain.Article) (int64, error)
 	Update(ctx context.Context, article domain.Article) error
 	Sync(ctx context.Context, article domain.Article) (int64, error)
+	SyncStatus(ctx *gin.Context, uid int64, id int64, private domain.ArticleStatus) error
 }
 
 type CachedArticleRepository struct {
@@ -25,6 +26,10 @@ type CachedArticleRepository struct {
 
 	// 【在repo开启事务】
 	db *gorm.DB
+}
+
+func (repo *CachedArticleRepository) SyncStatus(ctx *gin.Context, uid int64, id int64, status domain.ArticleStatus) error {
+	return repo.dao.SyncStatus(ctx, uid, id, status.ToUint8())
 }
 
 func NewArticleRepository(dao dao.ArticleDao, cache cache.ArticleCache) ArticleRepository {
@@ -117,18 +122,19 @@ func (repo *CachedArticleRepository) toPersistent(article domain.Article) dao.Ar
 		Title:    article.Title,
 		Content:  article.Content,
 		AuthorId: article.Author.Id,
+		Status:   article.Status.ToUint8(),
 	}
 }
 
-func (repo *CachedArticleRepository) toDomain(article dao.Article) domain.Article {
-	return domain.Article{
-		Id:      article.Id,
-		Title:   article.Title,
-		Content: article.Content,
-		Author: domain.Author{
-			Id: article.AuthorId,
-		},
-		Ctime: time.UnixMilli(article.Ctime),
-		Utime: time.UnixMilli(article.Utime),
-	}
-}
+//func (repo *CachedArticleRepository) toDomain(article dao.Article) domain.Article {
+//	return domain.Article{
+//		Id:      article.Id,
+//		Title:   article.Title,
+//		Content: article.Content,
+//		Author: domain.Author{
+//			Id: article.AuthorId,
+//		},
+//		Ctime: time.UnixMilli(article.Ctime),
+//		Utime: time.UnixMilli(article.Utime),
+//	}
+//}

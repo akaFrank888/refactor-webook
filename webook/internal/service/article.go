@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository"
 	"refactor-webook/webook/pkg/logger"
@@ -11,6 +12,7 @@ import (
 type ArticleService interface {
 	Save(ctx context.Context, article domain.Article) (int64, error)
 	Publish(ctx context.Context, article domain.Article) (int64, error)
+	Withdraw(ctx *gin.Context, uid int64, aid int64) error
 }
 
 type articleService struct {
@@ -20,6 +22,10 @@ type articleService struct {
 	authorRepo repository.ArticleAuthorRepository
 	readerRepo repository.ArticleReaderRepository
 	l          logger.LoggerV1
+}
+
+func (svc *articleService) Withdraw(ctx *gin.Context, uid int64, aid int64) error {
+	return svc.repo.SyncStatus(ctx, uid, aid, domain.ArticleStatusPrivate)
 }
 
 func NewArticleService(repo repository.ArticleRepository) ArticleService {
@@ -40,6 +46,8 @@ func NewArticleServiceV1(authorRepo repository.ArticleAuthorRepository, readerRe
 // Save note  判断article是新建还是更新在哪里进行分发？ ==》 service 层的 save()
 // Save note 如何判断article是新建还是更新？ ==》 传入了 id 就是更新，没传就是新建 ==》 update()只用返回 error ，create()还要返回id
 func (svc *articleService) Save(ctx context.Context, article domain.Article) (int64, error) {
+	article.Status = domain.ArticleStatusUnpublished
+
 	if article.Id > 0 {
 		// 是update
 		return article.Id, svc.Update(ctx, article)
@@ -52,6 +60,7 @@ func (svc *articleService) Update(ctx context.Context, article domain.Article) e
 }
 
 func (svc *articleService) Publish(ctx context.Context, article domain.Article) (int64, error) {
+	article.Status = domain.ArticleStatusPublished
 	return svc.repo.Sync(ctx, article)
 }
 
