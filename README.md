@@ -83,7 +83,11 @@
 
 ### week8
 （1）学习内容：
+1. 在`D:\minIO`目录下，执行`./minio server D:\minIO`，运行minio服务端
 
+（2）待办：
+1. 第3个视频的将MongoDB整合进项目中没完成
+2. 没有找到minio和cdn结合的方式
 
 
 

@@ -1,0 +1,26 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="GoDfaErrorMayBeNotNil" enabled="true" level="WARNING" enabled_by_default="true">
+      <methods>
+        <method importPath="go.mongodb.org/mongo-driver/mongo" receiver="*Collection" name="InsertOne" />
+        <method importPath="go.mongodb.org/mongo-driver/mongo" receiver="*Collection" name="UpdateOne" />
+        <method importPath="go.mongodb.org/mongo-driver/mongo" receiver="*Collection" name="DeleteMany" />
+        <method importPath="github.com/minio/minio-go/v7" receiver="*Client" name="PutObject" />
+      </methods>
+    </inspection_tool>
+    <inspection_tool class="GoUnhandledErrorResult" enabled="true" level="WARNING" enabled_by_default="true">
+      <functions>
+        <function importPath="fmt" name="Printf" />
+        <function importPath="math/rand" name="Read" />
+        <function importPath="errors" name="Unwrap" />
+        <function importPath="errors" name="Join" />
+        <function importPath="fmt" name="Errorf" />
+        <function importPath="fmt" name="Println" />
+        <function importPath="errors" name="New" />
+        <function importPath="fmt" name="Print" />
+        <function importPath="io/ioutil" name="ReadAll" />
+      </functions>
+    </inspection_tool>
+  </profile>
+</component>
