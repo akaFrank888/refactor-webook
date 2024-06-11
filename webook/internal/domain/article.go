@@ -27,7 +27,7 @@ func (a *Article) Abstract() string {
 
 // AbstractV1 用 gpt 生成 abstract
 func (a *Article) AbstractV1() string {
-
+	return " "
 }
 
 type Author struct {

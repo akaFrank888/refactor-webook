@@ -14,6 +14,10 @@ type ArticleDao interface {
 	Sync(ctx context.Context, article Article) (int64, error)
 	SyncStatus(ctx context.Context, uid int64, aid int64, status uint8) error
 	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
+	GetById(ctx context.Context, id int64) (Article, error)
+
+	// 读者 ，需要用 PublishedArticle 类型
+	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
 }
 
 type GormArticleDao struct {
@@ -179,6 +183,18 @@ func (dao *GormArticleDao) GetByAuthor(ctx context.Context, uid int64, offset in
 		Order("utime desc").
 		Find(&articles).Error
 	return articles, err
+}
+
+func (dao *GormArticleDao) GetById(ctx context.Context, id int64) (Article, error) {
+	var article Article
+	err := dao.db.WithContext(ctx).Where("id = ?", id).First(&article).Error
+	return article, err
+}
+
+func (dao *GormArticleDao) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
+	var article PublishedArticle
+	err := dao.db.WithContext(ctx).Where("id = ?", id).First(&article).Error
+	return article, err
 }
 
 type Article struct {

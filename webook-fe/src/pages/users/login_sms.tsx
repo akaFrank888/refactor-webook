@@ -5,7 +5,7 @@ import router from "next/router";
 
 const onFinish = (values: any) => {
     axios.post("/users/login_sms", values)
-        .then((res: { status: number; statusText: any; data: { code: number; msg: any; }; }) => {
+        .then((res) => {
             if(res.status != 200) {
                 alert(res.statusText);
                 return
@@ -16,7 +16,7 @@ const onFinish = (values: any) => {
                 return;
             }
             alert(res.data.msg)
-        }).catch((err: any) => {
+        }).catch((err) => {
         alert(err);
     })
 };
@@ -30,13 +30,13 @@ const LoginFormSMS: React.FC = () => {
 
     const sendCode = () => {
         const data = form.getFieldValue("phone")
-        axios.post("/users/login_sms/code/send", {"phone": data} ).then((res: { status: number; statusText: any; data: { msg: any; }; }) => {
+        axios.post("/users/login_sms/code/send", {"phone": data} ).then((res) => {
             if(res.status != 200) {
                 alert(res.statusText);
                 return
             }
             alert(res?.data?.msg || "系统错误，请重试")
-        }).catch((err: any) => {
+        }).catch((err) => {
             alert(err);
         })
     }

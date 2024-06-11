@@ -17,12 +17,17 @@ type ArticleRepository interface {
 	Sync(ctx context.Context, article domain.Article) (int64, error)
 	SyncStatus(ctx context.Context, uid int64, id int64, private domain.ArticleStatus) error
 	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
+	GetById(ctx context.Context, id int64) (domain.Article, error)
+
+	// 读者
+	GetPubById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type CachedArticleRepository struct {
-	dao   dao.ArticleDao
-	cache cache.ArticleCache
-	l     logger.LoggerV1
+	dao      dao.ArticleDao
+	cache    cache.ArticleCache
+	l        logger.LoggerV1
+	userRepo UserRepository
 
 	// V2 写法专用  ————  在repo层同步制作库和线上库的数据（完成分发） 【不在repo开启事务】
 	authorDao dao.ArticleAuthorDao
@@ -99,6 +104,18 @@ func (repo *CachedArticleRepository) Sync(ctx context.Context, article domain.Ar
 		// 清除缓存失败，记录日志
 		repo.l.Error("删除首页缓存失败", logger.Error(err))
 	}
+
+	// note 在 publish 成功后，将该文章缓存给读者【此处的expiration可以灵活设置：流量大的大V的expiration大，反之则小】
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		user, er := repo.userRepo.FindById(ctx, article.Author.Id)
+		if er != nil {
+			return
+		}
+		article.Author.Name = user.Nickname
+		err = repo.cache.SetPub(ctx, article)
+	}()
 
 	return articleId, err
 }
@@ -198,13 +215,80 @@ func (repo *CachedArticleRepository) GetByAuthor(ctx context.Context, uid int64,
 		return repo.toDomain(article)
 	})
 
-	// 回写缓存
-	if offset == 0 && limit == 100 {
-		err = repo.cache.SetFirstPage(ctx, uid, res)
-		if err != nil {
-			// 此处需要监控，网络连接问题，需要人工干预。
+	go func() {
+		// note 异步的话，要重新建立一个 context
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		// 回写缓存
+		if offset == 0 && limit == 100 {
+			err = repo.cache.SetFirstPage(ctx, uid, res)
+			if err != nil {
+				// 此处需要监控，网络连接问题，需要人工干预。
+			}
 		}
+	}()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		// note 缓存 id=1 的 article 【场景：当用户查询完一个作者的文章list后，大概率会查询作者 id=1 的文章】
+		repo.preCache(ctx, res)
+	}()
+	return res, nil
+
+}
+
+func (repo *CachedArticleRepository) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	articleCached, err := repo.cache.Get(ctx, id)
+	if err == nil {
+		// 缓存命中
+		return articleCached, nil
 	}
+
+	article, err := repo.dao.GetById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+
+	go func() {
+		// 回写缓存
+		er := repo.cache.Set(ctx, repo.toDomain(article))
+		if er != nil {
+			// 日志
+		}
+	}()
+
+	return repo.toDomain(article), nil
+}
+
+// note 需要封装 userRepo 里的 name
+func (repo *CachedArticleRepository) GetPubById(ctx context.Context, id int64) (domain.Article, error) {
+	articleCached, err := repo.cache.GetPub(ctx, id)
+	if err == nil {
+		return articleCached, nil
+	}
+	article, err := repo.dao.GetPubById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	res := repo.toDomain(dao.Article(article)) // note 偷懒的写法：将dao的PublishedArticle转成了dao的Article（但随着业务变复杂，PublishedArticle与Article字段不同后，需要单独为PublishedArticle==>domain.Article设计一个toDomain()）
+	author, err := repo.userRepo.FindById(ctx, article.AuthorId)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	res.Author.Name = author.Nickname
+
+	// 回写缓存
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		er := repo.cache.SetPub(ctx, res)
+		if er != nil {
+			// 日志
+		}
+	}()
+
 	return res, nil
 
 }
@@ -231,5 +315,20 @@ func (repo *CachedArticleRepository) toDomain(article dao.Article) domain.Articl
 		},
 		Ctime: time.UnixMilli(article.Ctime),
 		Utime: time.UnixMilli(article.Utime),
+	}
+}
+
+// 预加载 id = 1 的article
+// note 优化：只缓存小文章（考虑Redis内存和缓存性能的平衡）
+func (repo *CachedArticleRepository) preCache(ctx context.Context, res []domain.Article) {
+	// 1MB
+	const contentSizeThrehold = 1024 * 1024
+
+	if len(res) == 0 || len(res[0].Content) > contentSizeThrehold {
+		return
+	}
+	err := repo.cache.Set(ctx, res[0])
+	if err != nil {
+		repo.l.Error("提前缓存 id=1 的article失败", logger.Error(err))
 	}
 }

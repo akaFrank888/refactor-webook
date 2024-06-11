@@ -8,6 +8,7 @@ import (
 	"refactor-webook/webook/internal/web/jwt"
 	"refactor-webook/webook/pkg/kit"
 	"refactor-webook/webook/pkg/logger"
+	"strconv"
 	"time"
 )
 
@@ -31,9 +32,11 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 
 	// 创作者的查询接口
 	g.GET("/detail/:id", h.Detail) // 参数路由
-	g.POST("/list", h.List)        // note offset和limit不通过get方式拼接在url中，而是直接post到后端
+	g.POST("/list", h.List)        // note offset和 limit不通过 get方式拼接在url中，而是直接 post到后端
 
-	// 读者的查询接口
+	// 读者的查询接口 (查线上库)
+	p := g.Group("/pub")
+	p.GET("/:id", h.PubDetail)
 
 }
 
@@ -137,10 +140,6 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 	})
 }
 
-func (h *ArticleHandler) Detail(ctx *gin.Context) {
-
-}
-
 func (h *ArticleHandler) List(ctx *gin.Context) {
 	var page Page
 	if err := ctx.Bind(&page); err != nil {
@@ -179,5 +178,100 @@ func (h *ArticleHandler) List(ctx *gin.Context) {
 				Utime: src.Utime.Format(time.DateTime),
 			}
 		}),
+	})
+}
+
+func (h *ArticleHandler) Detail(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "参数错误",
+		})
+		h.l.Error("id 非法格式",
+			logger.String("id", idStr),
+			logger.Error(err))
+		return
+	}
+	article, err := h.svc.GetById(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("通过id获取文章失败",
+			logger.Int64("id", id),
+			logger.Error(err))
+		return
+	}
+	// note 取出article后要立即校验作者id
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	if article.Author.Id != uc.Uid {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("非法访问article，作者id不匹配",
+			logger.Int64("uid", uc.Uid), // 输出执行操作的用户id
+			logger.Error(err))
+		return
+	}
+
+	vo := ArticleVo{
+		Id: article.Id,
+		// 不需要返回article的abstract和AuthorId
+		Title:   article.Title,
+		Status:  article.Status.ToUint8(),
+		Content: article.Content,
+		// note 对时间进行格式转换！
+		Ctime: article.Ctime.Format(time.DateTime),
+		Utime: article.Utime.Format(time.DateTime),
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Data: vo,
+	})
+
+}
+
+func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "参数错误",
+		})
+		h.l.Error("id 非法格式",
+			logger.String("id", idStr),
+			logger.Error(err))
+		return
+	}
+	article, err := h.svc.GetPubById(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("通过id获取文章失败",
+			logger.Int64("id", id),
+			logger.Error(err))
+		return
+	}
+	vo := ArticleVo{
+		Id: article.Id,
+		// note 相比于创作者的 Detail()，需要多返回创作者的 id 和 name [此name需要在repo层结合userRepo进行封装对象]
+		Title:      article.Title,
+		Status:     article.Status.ToUint8(),
+		AuthorId:   article.Author.Id,
+		AuthorName: article.Author.Name,
+		Content:    article.Content,
+
+		Ctime: article.Ctime.Format(time.DateTime),
+		Utime: article.Utime.Format(time.DateTime),
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Data: vo,
 	})
 }

@@ -1,5 +1,16 @@
 ## 重构与复习
 
+### 启动：
+
+1） docker compose：在webook目录下，执行`docker compose up`
+
+2） 后端：运行main文件，将 Working Directory 改成 **/webook
+
+3） 前端启动： 在webook-fe目录下，执行`npm install`，等下载好接着执行`npm run dev`
+
+4） 若增删了模块的方法，可能要在webook目录下，执行`wire`
+
+
 ### week2
 （0） 学习内容：
 <img src="image/week2.png">
@@ -84,6 +95,7 @@
 ### week8
 （1）学习内容：
 1. 在`D:\minIO`目录下，执行`./minio server D:\minIO`，运行minio服务端
+2. 查询接口和缓存
 
 （2）待办：
 1. 第3个视频的将MongoDB整合进项目中没完成

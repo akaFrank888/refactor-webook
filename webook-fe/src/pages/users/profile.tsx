@@ -1,4 +1,3 @@
-// @ts-ignore
 import { ProDescriptions } from '@ant-design/pro-components';
 import React, { useState, useEffect } from 'react';
 import { Button } from 'antd';
@@ -12,8 +11,8 @@ function Page() {
     useEffect(() => {
         setLoading(true)
         axios.get('/users/profile')
-            .then((res: { data: any; }) => res.data)
-            .then((data: React.SetStateAction<Profile>) => {
+            .then((res) => res.data)
+            .then((data) => {
                 setData(data)
                 setLoading(false)
             })

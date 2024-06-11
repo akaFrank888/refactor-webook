@@ -8,8 +8,8 @@ function Page() {
     useEffect(() => {
         setLoading(true)
         axios.get('/oauth2/wechat/authurl')
-            .then((res: { data: any; }) => res.data)
-            .then((data: { data: string; }) => {
+            .then((res) => res.data)
+            .then((data) => {
                 setLoading(false)
                 if(data && data.data) {
                     window.location.href = data.data

@@ -11,7 +11,7 @@ const onFinish = (values: any) => {
         values.birthday = moment(values.birthday).format("YYYY-MM-DD")
     }
     axios.post("/users/edit", values)
-        .then((res: { status: number; statusText: any; data: { code: number; msg: any; }; }) => {
+        .then((res) => {
             if(res.status != 200) {
                 alert(res.statusText);
                 return
@@ -21,7 +21,7 @@ const onFinish = (values: any) => {
                 return
             }
             alert(res.data?.msg || "系统错误");
-        }).catch((err: any) => {
+        }).catch((err) => {
         alert(err);
     })
 };
@@ -31,15 +31,15 @@ const onFinishFailed = (errorInfo: any) => {
 };
 
 function EditForm() {
-    let p: Profile = {Email: "", Phone: "", Nickname: "", Birthday:"", AboutMe: ""}
+    const p: Profile = {} as Profile
     const [data, setData] = useState<Profile>(p)
     const [isLoading, setLoading] = useState(false)
 
     useEffect(() => {
         setLoading(true)
         axios.get('/users/profile')
-            .then((res: { data: any; }) => res.data)
-            .then((data: React.SetStateAction<Profile>) => {
+            .then((res) => res.data)
+            .then((data) => {
                 setData(data)
                 setLoading(false)
             })

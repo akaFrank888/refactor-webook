@@ -13,6 +13,10 @@ type ArticleCache interface {
 	GetFirstPage(ctx context.Context, uid int64) ([]domain.Article, error)
 	SetFirstPage(ctx context.Context, uid int64, res []domain.Article) error
 	DeleteFirstPage(ctx context.Context, uid int64) error
+	Get(ctx context.Context, id int64) (domain.Article, error)
+	Set(ctx context.Context, article domain.Article) error
+	GetPub(ctx context.Context, id int64) (domain.Article, error)
+	SetPub(ctx context.Context, article domain.Article) error
 }
 
 type RedisArticleCache struct {
@@ -55,7 +59,48 @@ func (r *RedisArticleCache) DeleteFirstPage(ctx context.Context, uid int64) erro
 	return r.client.Del(ctx, r.firstPageKey(uid)).Err()
 }
 
-// 读者端的缓存
+func (r *RedisArticleCache) Get(ctx context.Context, id int64) (domain.Article, error) {
+	res, err := r.client.Get(ctx, r.key(id)).Bytes()
+	if err != nil {
+		return domain.Article{}, err
+	}
+	var article domain.Article
+	err = json.Unmarshal(res, &article)
+	return article, err
+}
+
+func (r *RedisArticleCache) Set(ctx context.Context, article domain.Article) error {
+	data, err := json.Marshal(article)
+	if err != nil {
+		return err
+	}
+	return r.client.Set(ctx, r.key(article.Id), data, r.expiration).Err()
+}
+
+func (r *RedisArticleCache) GetPub(ctx context.Context, id int64) (domain.Article, error) {
+	res, err := r.client.Get(ctx, r.pubKey(id)).Bytes()
+	if err != nil {
+		return domain.Article{}, err
+	}
+	var article domain.Article
+	err = json.Unmarshal(res, &article)
+	return article, err
+}
+
+func (r *RedisArticleCache) SetPub(ctx context.Context, article domain.Article) error {
+	data, err := json.Marshal(article)
+	if err != nil {
+		return err
+	}
+	return r.client.Set(ctx, r.pubKey(article.Id), data, r.expiration).Err()
+}
+
 func (r *RedisArticleCache) firstPageKey(uid int64) string {
 	return fmt.Sprintf("article:first_page:%d", uid)
+}
+func (r *RedisArticleCache) pubKey(id int64) string {
+	return fmt.Sprintf("article:pub:detail:%d", id)
+}
+func (r *RedisArticleCache) key(id int64) string {
+	return fmt.Sprintf("article:detail:%d", id)
 }

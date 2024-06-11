@@ -2,16 +2,26 @@ import React from 'react';
 import { Button, Form, Input } from 'antd';
 import axios from "@/axios/axios";
 import Link from "next/link";
+import router from "next/router";
 
 const onFinish = (values: any) => {
     axios.post("/users/signup", values)
-        .then((res: { status: number; statusText: any; data: any; }) => {
+        .then((res) => {
             if(res.status != 200) {
                 alert(res.statusText);
                 return
             }
-           alert(res.data);
-        }).catch((err: any) => {
+            if(typeof res.data == 'string') {
+                alert(res.data);
+            } else {
+                const msg = res.data?.msg || JSON.stringify(res.data)
+                alert(msg);
+                if(res.data.code == 0) {
+                    router.push('/users/login')
+                }
+            }
+
+        }).catch((err) => {
             alert(err);
     })
 };

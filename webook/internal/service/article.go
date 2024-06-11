@@ -13,6 +13,10 @@ type ArticleService interface {
 	Publish(ctx context.Context, article domain.Article) (int64, error)
 	Withdraw(ctx context.Context, uid int64, aid int64) error
 	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
+	GetById(ctx context.Context, id int64) (domain.Article, error)
+
+	// note 读者的服  若是微服务架构，则读者服务和创作者服务会分成两个服务；单体应用可写成一块
+	GetPubById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type articleService struct {
@@ -110,4 +114,12 @@ func (svc *articleService) Withdraw(ctx context.Context, uid int64, aid int64) e
 
 func (svc *articleService) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
 	return svc.repo.GetByAuthor(ctx, uid, offset, limit)
+}
+
+func (svc *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	return svc.repo.GetById(ctx, id)
+}
+
+func (svc *articleService) GetPubById(ctx context.Context, id int64) (domain.Article, error) {
+	return svc.repo.GetPubById(ctx, id)
 }
