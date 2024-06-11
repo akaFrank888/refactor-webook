@@ -3,7 +3,6 @@ package dao
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -13,7 +12,8 @@ type ArticleDao interface {
 	Insert(ctx context.Context, article Article) (int64, error)
 	UpdateById(ctx context.Context, article Article) error
 	Sync(ctx context.Context, article Article) (int64, error)
-	SyncStatus(ctx *gin.Context, uid int64, aid int64, status uint8) error
+	SyncStatus(ctx context.Context, uid int64, aid int64, status uint8) error
+	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
 }
 
 type GormArticleDao struct {
@@ -91,7 +91,7 @@ func (dao *GormArticleDao) Sync(ctx context.Context, article Article) (int64, er
 	return id, err
 }
 
-func (dao *GormArticleDao) SyncStatus(ctx *gin.Context, uid int64, aid int64, status uint8) error {
+func (dao *GormArticleDao) SyncStatus(ctx context.Context, uid int64, aid int64, status uint8) error {
 	now := time.Now().UnixMilli()
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// updates 语句需要接收res来判断是否更新成功
@@ -168,6 +168,17 @@ func (dao *GormArticleDao) SyncV1(ctx context.Context, article Article) (int64, 
 	}
 	tx.Commit()
 	return id, nil
+}
+
+func (dao *GormArticleDao) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error) {
+	var articles []Article
+	err := dao.db.WithContext(ctx).Where("author_id = ?", uid).
+		Offset(offset).
+		Limit(limit).
+		// note 按照 utime 倒序
+		Order("utime desc").
+		Find(&articles).Error
+	return articles, err
 }
 
 type Article struct {

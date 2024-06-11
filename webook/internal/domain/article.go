@@ -15,6 +15,21 @@ type Article struct {
 	Status ArticleStatus
 }
 
+// Abstract 取content的前128个字作为摘要
+func (a *Article) Abstract() string {
+	str := []rune(a.Content)
+	if len(str) > 128 {
+		str = str[:128]
+	}
+	return string(str)
+
+}
+
+// AbstractV1 用 gpt 生成 abstract
+func (a *Article) AbstractV1() string {
+
+}
+
 type Author struct {
 	Id   int64
 	Name string

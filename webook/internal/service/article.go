@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository"
 	"refactor-webook/webook/pkg/logger"
@@ -12,7 +11,8 @@ import (
 type ArticleService interface {
 	Save(ctx context.Context, article domain.Article) (int64, error)
 	Publish(ctx context.Context, article domain.Article) (int64, error)
-	Withdraw(ctx *gin.Context, uid int64, aid int64) error
+	Withdraw(ctx context.Context, uid int64, aid int64) error
+	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 }
 
 type articleService struct {
@@ -22,10 +22,6 @@ type articleService struct {
 	authorRepo repository.ArticleAuthorRepository
 	readerRepo repository.ArticleReaderRepository
 	l          logger.LoggerV1
-}
-
-func (svc *articleService) Withdraw(ctx *gin.Context, uid int64, aid int64) error {
-	return svc.repo.SyncStatus(ctx, uid, aid, domain.ArticleStatusPrivate)
 }
 
 func NewArticleService(repo repository.ArticleRepository) ArticleService {
@@ -106,4 +102,12 @@ func (svc *articleService) PublishV1(ctx context.Context, article domain.Article
 		logger.Error(err))
 
 	return id, errors.New("保存到线上库失败，次数耗尽")
+}
+
+func (svc *articleService) Withdraw(ctx context.Context, uid int64, aid int64) error {
+	return svc.repo.SyncStatus(ctx, uid, aid, domain.ArticleStatusPrivate)
+}
+
+func (svc *articleService) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
+	return svc.repo.GetByAuthor(ctx, uid, offset, limit)
 }

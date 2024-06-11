@@ -2,23 +2,27 @@ package repository
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
+	"refactor-webook/webook/pkg/kit"
+	"refactor-webook/webook/pkg/logger"
+	"time"
 )
 
 type ArticleRepository interface {
 	Create(ctx context.Context, article domain.Article) (int64, error)
 	Update(ctx context.Context, article domain.Article) error
 	Sync(ctx context.Context, article domain.Article) (int64, error)
-	SyncStatus(ctx *gin.Context, uid int64, id int64, private domain.ArticleStatus) error
+	SyncStatus(ctx context.Context, uid int64, id int64, private domain.ArticleStatus) error
+	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 }
 
 type CachedArticleRepository struct {
 	dao   dao.ArticleDao
 	cache cache.ArticleCache
+	l     logger.LoggerV1
 
 	// V2 写法专用  ————  在repo层同步制作库和线上库的数据（完成分发） 【不在repo开启事务】
 	authorDao dao.ArticleAuthorDao
@@ -28,8 +32,18 @@ type CachedArticleRepository struct {
 	db *gorm.DB
 }
 
-func (repo *CachedArticleRepository) SyncStatus(ctx *gin.Context, uid int64, id int64, status domain.ArticleStatus) error {
-	return repo.dao.SyncStatus(ctx, uid, id, status.ToUint8())
+func (repo *CachedArticleRepository) SyncStatus(ctx context.Context, uid int64, id int64, status domain.ArticleStatus) error {
+
+	err := repo.dao.SyncStatus(ctx, uid, id, status.ToUint8())
+	if err == nil {
+		// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+		err = repo.cache.DeleteFirstPage(ctx, uid)
+		if err != nil {
+			// 清除缓存失败，记录日志
+			repo.l.Error("删除首页缓存失败", logger.Error(err))
+		}
+	}
+	return err
 }
 
 func NewArticleRepository(dao dao.ArticleDao, cache cache.ArticleCache) ArticleRepository {
@@ -47,16 +61,46 @@ func NewArticleRepositoryV2(authorDao dao.ArticleAuthorDao, readerDao dao.Articl
 }
 
 func (repo *CachedArticleRepository) Create(ctx context.Context, article domain.Article) (int64, error) {
-	return repo.dao.Insert(ctx, repo.toPersistent(article))
+	articleId, err := repo.dao.Insert(ctx, repo.toPersistent(article))
+	if err == nil {
+		// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+		err = repo.cache.DeleteFirstPage(ctx, article.Author.Id)
+		if err != nil {
+			// 清除缓存失败，记录日志
+			repo.l.Error("删除首页缓存失败", logger.Error(err))
+		}
+	}
+	return articleId, err
 }
 
 func (repo *CachedArticleRepository) Update(ctx context.Context, article domain.Article) error {
-	return repo.dao.UpdateById(ctx, repo.toPersistent(article))
+	err := repo.dao.UpdateById(ctx, repo.toPersistent(article))
+	if err == nil {
+		// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+		err = repo.cache.DeleteFirstPage(ctx, article.Author.Id)
+		if err != nil {
+			// 清除缓存失败，记录日志
+			repo.l.Error("删除首页缓存失败", logger.Error(err))
+		}
+	}
+	return err
 }
 
 // Sync note 【在dao层完成“发表”中制作库和线上库的分发或者叫同步，同库不同表，引入事务】
 func (repo *CachedArticleRepository) Sync(ctx context.Context, article domain.Article) (int64, error) {
-	return repo.dao.Sync(ctx, repo.toPersistent(article))
+	articleId, err := repo.dao.Sync(ctx, repo.toPersistent(article))
+	if err != nil {
+		return 0, err
+	}
+
+	// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+	err = repo.cache.DeleteFirstPage(ctx, article.Author.Id)
+	if err != nil {
+		// 清除缓存失败，记录日志
+		repo.l.Error("删除首页缓存失败", logger.Error(err))
+	}
+
+	return articleId, err
 }
 
 // SyncV1 note 【在repo层完成“发表”中制作库和线上库的分发或者叫同步】【V1：假定制作库和线上库是不同一个数据库，所以是不存在事务】
@@ -74,6 +118,14 @@ func (repo *CachedArticleRepository) SyncV1(ctx context.Context, article domain.
 	if err != nil {
 		return 0, err
 	}
+
+	// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+	err = repo.cache.DeleteFirstPage(ctx, article.Author.Id)
+	if err != nil {
+		// 清除缓存失败，记录日志
+		repo.l.Error("删除首页缓存失败", logger.Error(err))
+	}
+
 	// note 这句其实可以省略，因为dao层的gorm会创建个id并赋值给article，但防止dao换了别的实现，还是建议不省略
 	article.Id = id
 	return id, repo.readerDao.Upsert(ctx, article2Persistent)
@@ -104,6 +156,14 @@ func (repo *CachedArticleRepository) SyncV2(ctx context.Context, article domain.
 	if err != nil {
 		return 0, err
 	}
+
+	// note 在新写文章、编辑文章、发表的时候都要清除相关的缓存【保证缓存的一致性】
+	err = repo.cache.DeleteFirstPage(ctx, article.Author.Id)
+	if err != nil {
+		// 清除缓存失败，记录日志
+		repo.l.Error("删除首页缓存失败", logger.Error(err))
+	}
+
 	article.Id = id
 	err = readerDao.UpsertV2(ctx, article2Persistent)
 	if err != nil {
@@ -112,6 +172,40 @@ func (repo *CachedArticleRepository) SyncV2(ctx context.Context, article domain.
 	// note 手动 commit 要注意：1）“return 0, err”前都会回滚 2）虽然是 commit 后再 rollback 会报错，但不理它即可
 	tx.Commit()
 	return id, nil
+
+}
+
+func (repo *CachedArticleRepository) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
+	// note 缓存第一页的分页结果，所以要限定offset和limit【场景：用户一般只看第一页就找到结果】
+	// 可优化： limit <= 100 也可以读缓存
+	if offset == 0 && limit == 100 {
+		res, err := repo.cache.GetFirstPage(ctx, uid)
+		if err == nil {
+			// 缓存命中
+			return res, nil
+		} else {
+			// 未命中或者连接redis的网络问题
+			// todo 此处需要日志或监控
+		}
+	}
+
+	articles, err := repo.dao.GetByAuthor(ctx, uid, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	// note 将articles中的每一个dao类型的article转成domain类型的article
+	res := kit.Map[dao.Article, domain.Article](articles, func(idx int, article dao.Article) domain.Article {
+		return repo.toDomain(article)
+	})
+
+	// 回写缓存
+	if offset == 0 && limit == 100 {
+		err = repo.cache.SetFirstPage(ctx, uid, res)
+		if err != nil {
+			// 此处需要监控，网络连接问题，需要人工干预。
+		}
+	}
+	return res, nil
 
 }
 
@@ -126,15 +220,16 @@ func (repo *CachedArticleRepository) toPersistent(article domain.Article) dao.Ar
 	}
 }
 
-//func (repo *CachedArticleRepository) toDomain(article dao.Article) domain.Article {
-//	return domain.Article{
-//		Id:      article.Id,
-//		Title:   article.Title,
-//		Content: article.Content,
-//		Author: domain.Author{
-//			Id: article.AuthorId,
-//		},
-//		Ctime: time.UnixMilli(article.Ctime),
-//		Utime: time.UnixMilli(article.Utime),
-//	}
-//}
+func (repo *CachedArticleRepository) toDomain(article dao.Article) domain.Article {
+	return domain.Article{
+		Id:      article.Id,
+		Title:   article.Title,
+		Content: article.Content,
+		Status:  domain.ArticleStatus(article.Status),
+		Author: domain.Author{
+			Id: article.AuthorId,
+		},
+		Ctime: time.UnixMilli(article.Ctime),
+		Utime: time.UnixMilli(article.Utime),
+	}
+}

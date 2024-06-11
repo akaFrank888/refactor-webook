@@ -12,6 +12,7 @@ import (
 var ErrKeyNotExist = redis.Nil
 
 type UserCache interface {
+	// Get note 不需要为 Cache 设计专属的结构体
 	Get(ctx context.Context, id int64) (domain.User, error)
 	Set(ctx context.Context, user domain.User) error
 	Del(ctx context.Context, id int64) error
@@ -30,7 +31,7 @@ func NewUserCache(cmd redis.Cmdable) UserCache {
 	}
 }
 
-// key首字母小写，是内部方法（不暴露在接口中）
+// key内部方法（不暴露在接口中）
 func (uc *RedisUserCache) key(id int64) string {
 	return fmt.Sprintf("user:info:%d", id) // note 向repo层屏蔽key的组成
 }

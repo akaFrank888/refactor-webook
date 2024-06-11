@@ -6,7 +6,9 @@ import (
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
 	"refactor-webook/webook/internal/web/jwt"
+	"refactor-webook/webook/pkg/kit"
 	"refactor-webook/webook/pkg/logger"
+	"time"
 )
 
 type ArticleHandler struct {
@@ -26,6 +28,13 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
 	g.POST("/withdraw", h.Withdraw)
+
+	// 创作者的查询接口
+	g.GET("/detail/:id", h.Detail) // 参数路由
+	g.POST("/list", h.List)        // note offset和limit不通过get方式拼接在url中，而是直接post到后端
+
+	// 读者的查询接口
+
 }
 
 // Edit 约定：接收 Article 输入，返回 文章的ID
@@ -125,5 +134,50 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "ok",
+	})
+}
+
+func (h *ArticleHandler) Detail(ctx *gin.Context) {
+
+}
+
+func (h *ArticleHandler) List(ctx *gin.Context) {
+	var page Page
+	if err := ctx.Bind(&page); err != nil {
+		return
+	}
+
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	articles, err := h.svc.GetByAuthor(ctx, uc.Uid, page.Offset, page.Limit)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("查找文章列表失败",
+			logger.Error(err),
+			logger.Int64("uid", uc.Uid),
+			logger.Int("offset", page.Offset),
+			logger.Int("limit", page.Limit),
+		)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		// note 不能直接把 domain 的数据暴露给前端
+		Data: kit.Map[domain.Article, ArticleVo](articles, func(idx int, src domain.Article) ArticleVo {
+			return ArticleVo{
+				Id: src.Id,
+				// 不需要返回article的content和AuthorId
+				Title:    src.Title,
+				Status:   src.Status.ToUint8(),
+				AuthorId: src.Author.Id,
+
+				Abstract: src.Abstract(),
+				// note 对时间进行格式转换！
+				Ctime: src.Ctime.Format(time.DateTime),
+				Utime: src.Utime.Format(time.DateTime),
+			}
+		}),
 	})
 }
