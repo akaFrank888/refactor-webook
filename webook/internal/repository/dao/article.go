@@ -16,7 +16,7 @@ type ArticleDao interface {
 	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
 	GetById(ctx context.Context, id int64) (Article, error)
 
-	// 读者 ，需要用 PublishedArticle 类型
+	// GetPubById 读者 ，需要用 PublishedArticle 类型
 	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
 }
 

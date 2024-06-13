@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"refactor-webook/webook/internal/domain"
@@ -13,13 +14,19 @@ import (
 )
 
 type ArticleHandler struct {
-	svc service.ArticleService
+	svc      service.ArticleService
+	interSvc service.InteractiveService
+
+	biz string
 	l   logger.LoggerV1
 }
 
-func NewArticleHandler(svc service.ArticleService, l logger.LoggerV1) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, interSvc service.InteractiveService, l logger.LoggerV1) *ArticleHandler {
 	return &ArticleHandler{
-		svc: svc,
+		svc:      svc,
+		interSvc: interSvc,
+
+		biz: "article",
 		l:   l,
 	}
 }
@@ -248,6 +255,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+
 	article, err := h.svc.GetPubById(ctx, id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -259,6 +267,21 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+
+	// note 看完一篇article后，文章（某资源）的阅读数+1，用 异步 实现
+	go func() {
+		// 1. 如果你想摆脱原本主链路的超时控制，你就创建一个新的
+		// 2. 如果你不想，你就用 ctx
+		newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		er := h.interSvc.IncrReadCnt(newCtx, h.biz, id)
+		if er != nil {
+			h.l.Error("更新阅读数失败",
+				logger.Int64("aid", id),
+				logger.Error(err))
+		}
+	}()
+
 	vo := ArticleVo{
 		Id: article.Id,
 		// note 相比于创作者的 Detail()，需要多返回创作者的 id 和 name [此name需要在repo层结合userRepo进行封装对象]
