@@ -262,7 +262,7 @@ func (repo *CachedArticleRepository) GetById(ctx context.Context, id int64) (dom
 	return repo.toDomain(article), nil
 }
 
-// note 需要封装 userRepo 里的 name
+// GetPubById note 需要封装 userRepo 里的 name
 func (repo *CachedArticleRepository) GetPubById(ctx context.Context, id int64) (domain.Article, error) {
 	articleCached, err := repo.cache.GetPub(ctx, id)
 	if err == nil {

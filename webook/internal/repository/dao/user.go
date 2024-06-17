@@ -11,7 +11,6 @@ import (
 
 var (
 	ErrUserDuplicateUser = errors.New("邮箱/手机号冲突")
-	ErrRecordNotFound    = gorm.ErrRecordNotFound
 )
 
 type UserDao interface {

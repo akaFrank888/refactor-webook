@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 	"net/http"
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/service"
@@ -44,6 +45,8 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	// 读者的查询接口 (查线上库)
 	p := g.Group("/pub")
 	p.GET("/:id", h.PubDetail)
+	p.POST("/like", h.Like)       // 点赞或取消点赞
+	p.POST("/collect", h.Collect) // 点赞或取消点赞
 
 }
 
@@ -256,14 +259,34 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		return
 	}
 
-	article, err := h.svc.GetPubById(ctx, id)
+	// 在查看文章时返回对应的interactive
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	var (
+		eg      errgroup.Group
+		article domain.Article
+		inter   domain.Interactive
+	)
+	// note 1. 开启errgroup 2. goroutine中不要复用外面的error
+	eg.Go(func() error {
+		var er error
+		article, er = h.svc.GetPubById(ctx, id)
+		return er
+	})
+	eg.Go(func() error {
+		var er error
+		inter, er = h.interSvc.Get(ctx, h.biz, id, uc.Uid)
+		return er
+	})
+
+	err = eg.Wait()
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
-		h.l.Error("通过id获取文章失败",
-			logger.Int64("id", id),
+		h.l.Error("通过id获取文章的interactive失败",
+			logger.Int64("aid", id),
+			logger.Int64("uid", uc.Uid),
 			logger.Error(err))
 		return
 	}
@@ -291,10 +314,89 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		AuthorName: article.Author.Name,
 		Content:    article.Content,
 
+		ReadCnt:    inter.ReadCnt,
+		LikeCnt:    inter.LikeCnt,
+		CollectCnt: inter.CollectCnt,
+		Liked:      inter.Liked,
+		Collected:  inter.Collected,
+
 		Ctime: article.Ctime.Format(time.DateTime),
 		Utime: article.Utime.Format(time.DateTime),
 	}
 	ctx.JSON(http.StatusOK, Result{
 		Data: vo,
+	})
+}
+
+func (h *ArticleHandler) Like(ctx *gin.Context) {
+	type Req struct {
+		Id int64 `json:"id"`
+		// ture:点赞   false:取消点赞
+		Like bool `json:"like"`
+	}
+
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	// note 将点赞和取消点赞视为两个业务逻辑，所以在web层进行分发
+	var err error
+	if req.Like {
+		err = h.interSvc.Like(ctx, h.biz, req.Id, uc.Uid)
+	} else {
+		err = h.interSvc.CancelLike(ctx, h.biz, req.Id, uc.Uid)
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "系统错误",
+		})
+		h.l.Error("点赞/取消点赞失败",
+			logger.Error(err),
+			logger.Int64("uid", uc.Uid),
+			logger.Int64("aid", req.Id))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "ok",
+	})
+
+}
+
+func (h *ArticleHandler) Collect(ctx *gin.Context) {
+	type Req struct {
+		Id int64 `json:"id"`
+		// ture:收藏   false:取消收藏
+		Collect bool `json:"collect"`
+		// 收藏夹的id
+		Cid int64 `json:"cid"`
+	}
+
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	// note 将点赞和取消点赞视为两个业务逻辑，所以在web层进行分发
+	var err error
+	if req.Collect {
+		err = h.interSvc.Collect(ctx, h.biz, req.Id, uc.Uid, req.Cid)
+	} else {
+		err = h.interSvc.CancelCollect(ctx, h.biz, req.Id, uc.Uid, req.Cid)
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "系统错误",
+		})
+		h.l.Error("收藏/取消收藏失败",
+			logger.Error(err),
+			logger.Int64("uid", uc.Uid),
+			logger.Int64("aid", req.Id))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "ok",
 	})
 }

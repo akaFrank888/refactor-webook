@@ -7,7 +7,14 @@ type ArticleVo struct {
 	Abstract   string `json:"abstract,omitempty"`
 	Content    string `json:"content,omitempty"`
 	AuthorId   int64  `json:"authorId,omitempty"`
-	AuthorName string `json:"authorId,omitempty"`
+	AuthorName string `json:"authorName,omitempty"`
+
+	// note 常见需求：阅读、点赞数、收藏数和是否赞过、是否收藏
+	ReadCnt    int64 `json:"readCnt"`
+	LikeCnt    int64 `json:"likeCnt"`
+	CollectCnt int64 `json:"collectCnt"`
+	Liked      bool  `json:"liked"`
+	Collected  bool  `json:"collected"`
 
 	Ctime string `json:"ctime,omitempty"`
 	Utime string `json:"utime,omitempty"`
