@@ -10,6 +10,7 @@ import (
 
 type InteractiveRepository interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
+	BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error
 	IncrLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	DecrLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	AddCollectionItem(ctx context.Context, biz string, bizId int64, uid int64, cid int64) error
@@ -28,14 +29,6 @@ type CachedInteractiveRepository struct {
 
 func NewCachedInteractiveRepository(dao dao.InteractiveDao, cache cache.InteractiveCache) InteractiveRepository {
 	return &CachedInteractiveRepository{dao: dao, cache: cache}
-}
-
-func (c *CachedInteractiveRepository) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
-	err := c.dao.IncrReadCnt(ctx, biz, bizId)
-	if err != nil {
-		return err
-	}
-	return c.cache.IncrReadCntIfExist(ctx, biz, bizId)
 }
 
 func (c *CachedInteractiveRepository) IncrLike(ctx context.Context, biz string, bizId int64, uid int64) error {
@@ -109,6 +102,30 @@ func (c *CachedInteractiveRepository) Liked(ctx context.Context, biz string, biz
 	default:
 		return false, err
 	}
+}
+
+func (c *CachedInteractiveRepository) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
+	err := c.dao.IncrReadCnt(ctx, biz, bizId)
+	if err != nil {
+		return err
+	}
+	return c.cache.IncrReadCntIfExist(ctx, biz, bizId)
+}
+
+func (c *CachedInteractiveRepository) BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error {
+	err := c.dao.BatchIncrReadCnt(ctx, biz, bizId)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for i := 0; i < len(biz); i++ {
+			er := c.cache.IncrReadCntIfExist(ctx, biz[i], bizId[i])
+			if er != nil {
+				// 记录日志
+			}
+		}
+	}()
+	return nil
 }
 
 // Collected 没用缓存

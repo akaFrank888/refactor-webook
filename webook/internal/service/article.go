@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"refactor-webook/webook/internal/domain"
+	"refactor-webook/webook/internal/events/article"
 	"refactor-webook/webook/internal/repository"
 	"refactor-webook/webook/pkg/logger"
 )
@@ -15,12 +16,13 @@ type ArticleService interface {
 	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
 
-	// note 读者的服  若是微服务架构，则读者服务和创作者服务会分成两个服务；单体应用可写成一块
-	GetPubById(ctx context.Context, id int64) (domain.Article, error)
+	// GetPubById note 读者的服  若是微服务架构，则读者服务和创作者服务会分成两个服务；单体应用可写成一块
+	GetPubById(ctx context.Context, id, uid int64) (domain.Article, error)
 }
 
 type articleService struct {
-	repo repository.ArticleRepository
+	repo     repository.ArticleRepository
+	producer article.Producer
 
 	// V1 写法专用  ————  在Service层同步制作库和线上库的数据（完成分发）
 	authorRepo repository.ArticleAuthorRepository
@@ -28,9 +30,10 @@ type articleService struct {
 	l          logger.LoggerV1
 }
 
-func NewArticleService(repo repository.ArticleRepository) ArticleService {
+func NewArticleService(repo repository.ArticleRepository, producer article.Producer) ArticleService {
 	return &articleService{
-		repo: repo,
+		repo:     repo,
+		producer: producer,
 	}
 }
 
@@ -120,6 +123,23 @@ func (svc *articleService) GetById(ctx context.Context, id int64) (domain.Articl
 	return svc.repo.GetById(ctx, id)
 }
 
-func (svc *articleService) GetPubById(ctx context.Context, id int64) (domain.Article, error) {
-	return svc.repo.GetPubById(ctx, id)
+func (svc *articleService) GetPubById(ctx context.Context, id, uid int64) (domain.Article, error) {
+	res, err := svc.repo.GetPubById(ctx, id)
+
+	// 向 kafka 发送消息
+	go func() {
+		if err == nil {
+			er := svc.producer.ProduceReadEvent(article.ReadEvent{
+				Aid: id,
+				Uid: uid,
+			})
+			if er != nil {
+				svc.l.Error("发送 ReadEvent 失败",
+					logger.Error(er),
+					logger.Int64("aid", id),
+					logger.Int64("uid", uid))
+			}
+		}
+	}()
+	return res, err
 }

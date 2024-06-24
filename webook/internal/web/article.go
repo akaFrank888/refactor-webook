@@ -269,7 +269,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	// note 1. 开启errgroup 2. goroutine中不要复用外面的error
 	eg.Go(func() error {
 		var er error
-		article, er = h.svc.GetPubById(ctx, id)
+		article, er = h.svc.GetPubById(ctx, id, uc.Uid)
 		return er
 	})
 	eg.Go(func() error {

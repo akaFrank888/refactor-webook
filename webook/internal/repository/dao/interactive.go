@@ -10,6 +10,7 @@ import (
 
 type InteractiveDao interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
+	BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error
 	InsertLikeInfo(ctx context.Context, biz string, bizId int64, uid int64) error
 	InsertCancelLikeInfo(ctx context.Context, biz string, bizId int64, uid int64) error
 	InsertCollectionBiz(ctx context.Context, biz string, bizId int64, uid int64, cid int64) error
@@ -25,24 +26,6 @@ type GormInteractiveDao struct {
 
 func NewGormInteractiveDao(db *gorm.DB) InteractiveDao {
 	return &GormInteractiveDao{db: db}
-}
-
-// IncrReadCnt 增加阅读数的dao层面实现是 Upsert
-func (d *GormInteractiveDao) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
-	now := time.Now().UnixMilli()
-	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			// note GORM支持SQL表达式
-			"read_cnt": gorm.Expr("read_cnt + 1"),
-			"utime":    now,
-		}),
-	}).Create(&Interactive{
-		ReadCnt: 1,
-		BizId:   bizId,
-		Biz:     biz,
-		Ctime:   now,
-		Utime:   now,
-	}).Error
 }
 
 // InsertLikeInfo 1. 表interactive中增加阅读数 2. 表UserLikeBiz中Upsert操作status状态为1  【两者处于同一事务中】
@@ -180,6 +163,38 @@ func (d *GormInteractiveDao) GetCollectInfo(ctx context.Context, biz string, biz
 func (d *GormInteractiveDao) Get(ctx context.Context, biz string, bizId int64) (Interactive, error) {
 	var i Interactive
 	return i, d.db.WithContext(ctx).Where("biz = ? AND biz_id = ?", biz, bizId).First(&i).Error
+}
+
+// IncrReadCnt 增加阅读数的dao层面实现是 Upsert
+func (d *GormInteractiveDao) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
+	now := time.Now().UnixMilli()
+	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			// note GORM支持SQL表达式
+			"read_cnt": gorm.Expr("read_cnt + 1"),
+			"utime":    now,
+		}),
+	}).Create(&Interactive{
+		ReadCnt: 1,
+		BizId:   bizId,
+		Biz:     biz,
+		Ctime:   now,
+		Utime:   now,
+	}).Error
+}
+
+func (dao *GormInteractiveDao) BatchIncrReadCnt(ctx context.Context, bizs []string, bizIds []int64) error {
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// note 开启事务，并多次调用dao的单次插入的方法，最后一次提交【只提交1次，比多次提交要快一个数量级】
+		txDAO := NewGormInteractiveDao(tx)
+		for i := 0; i < len(bizs); i++ {
+			err := txDAO.IncrReadCnt(ctx, bizs[i], bizIds[i])
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type Interactive struct {

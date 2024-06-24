@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-var ErrKeyNotExist = redis.Nil
-
 type UserCache interface {
 	// Get note 不需要为 Cache 设计专属的结构体
 	Get(ctx context.Context, id int64) (domain.User, error)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"refactor-webook/webook/internal/domain"
-	"refactor-webook/webook/internal/repository/dao"
 	"strconv"
 	"time"
 )
@@ -75,7 +74,7 @@ func (c *RedisInteractiveCache) Get(ctx context.Context, biz string, bizId int64
 		return domain.Interactive{}, err
 	}
 	if len(res) == 0 {
-		return domain.Interactive{}, dao.ErrKeyNotExist
+		return domain.Interactive{}, ErrKeyNotExist
 	}
 	// 将取出来的string转成int，此处直接忽略掉错误
 	var inter domain.Interactive
@@ -89,11 +88,15 @@ func (c *RedisInteractiveCache) Get(ctx context.Context, biz string, bizId int64
 func (c *RedisInteractiveCache) Set(ctx context.Context, biz string, bizId int64, inter domain.Interactive) error {
 	key := c.key(biz, bizId)
 	// note HSet()用于设置哈希表值的多个字段
-	return c.client.HSet(ctx, key,
+	err := c.client.HSet(ctx, key,
 		fieldReadCnt, inter.ReadCnt,
 		fieldLikeCnt, inter.LikeCnt,
 		fieldCollectionCnt, inter.CollectCnt,
 	).Err()
+	// 重新设置过期时间
+	c.expiration = time.Minute * 15
+
+	return err
 }
 
 func (c *RedisInteractiveCache) key(biz string, bizId int64) string {

@@ -12,6 +12,7 @@
 
 5） 添加新的表后，要在 init_tables.go里添加
 
+（高版本的go建议使用 `go install` 来安装依赖）
 
 ### week2
 （0） 学习内容：

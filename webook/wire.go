@@ -3,8 +3,8 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"refactor-webook/webook/internal/events/article"
 	"refactor-webook/webook/internal/repository"
 	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
@@ -21,17 +21,25 @@ var interactiveSvcSet = wire.NewSet(
 	service.NewInteractiveService,
 )
 
-func InitWebServer() *gin.Engine {
+func InitWebServer() *App {
 	wire.Build(
 		// 第三方依赖
 		ioc.InitDB, ioc.InitRedis,
 		ioc.InitLogger,
+		ioc.InitSaramaClient,
+		ioc.InitSyncProducer,
+
 		// dao和cache
 		dao.NewUserDao, cache.NewUserCache, cache.NewCodeCache,
 		dao.NewArticleDao, cache.NewArticleCache,
 		// repo
 		repository.NewUserRepository, repository.NewCodeRepository,
 		repository.NewArticleRepository,
+
+		article.NewInteractiveReadEventConsumer,
+		article.NewSaramaSyncProducer,
+		ioc.InitConsumers,
+
 		// service
 		ioc.InitSMSService, service.NewUserService, service.NewCodeService,
 		ioc.InitWechatService,
@@ -47,7 +55,9 @@ func InitWebServer() *gin.Engine {
 		// web 服务器
 		ioc.InitWebServer,
 
+		wire.Struct(new(App), "*"),
+
 		interactiveSvcSet,
 	)
-	return gin.Default()
+	return new(App)
 }
