@@ -4,6 +4,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	redis_contrib "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"net/http"
 	"refactor-webook/webook/internal/web/middleware"
@@ -13,6 +14,7 @@ func main() {
 
 	initLogger()
 	app := InitWebServer()
+	initPrometheus()
 	for _, c := range app.consumers {
 		err := c.Start()
 		if err != nil {
@@ -32,6 +34,13 @@ func initLogger() {
 		panic(err)
 	}
 	zap.ReplaceGlobals(logger)
+}
+
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8081", nil)
+	}()
 }
 
 func useJWT(server *gin.Engine) {

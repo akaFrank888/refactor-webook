@@ -4,7 +4,7 @@
 
 1） docker compose：在webook目录下，执行`docker compose up`
 
-2） 后端：运行main文件，将 Working Directory 改成 **/webook
+2） 后端：运行main文件，将 Working Directory 改成 **/webook，且 Program arguments 改成 `--config=config/dev.yaml`
 
 3） 前端启动： 在webook-fe目录下，执行`npm install`，等下载好接着执行`npm run dev`
 

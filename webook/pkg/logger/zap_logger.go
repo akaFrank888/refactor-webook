@@ -2,7 +2,6 @@ package logger
 
 import "go.uber.org/zap"
 
-// ZapLogger note 用 zap 适配自定义的 LoggerV1 接口
 type ZapLogger struct {
 	l *zap.Logger
 }

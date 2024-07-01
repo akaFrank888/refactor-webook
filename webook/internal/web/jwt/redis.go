@@ -13,7 +13,7 @@ import (
 
 type RedisJWTHandler struct {
 	client redis.Cmdable
-	// 长token的过期时间
+	// 长token和ssid的过期时间
 	rcExpiration time.Duration
 }
 

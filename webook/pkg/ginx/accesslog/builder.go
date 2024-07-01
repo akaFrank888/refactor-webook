@@ -1,4 +1,4 @@
-package middleware
+package accesslog
 
 import (
 	"bytes"
@@ -9,9 +9,10 @@ import (
 )
 
 type LogMiddlewareBuilder struct {
+	// 打印什么级别的日志
 	logFn func(ctx context.Context, l AccessLog)
 
-	// 是否让req和resp打印
+	// 考虑线上环境：是否让req和resp打印
 	allowReqBody  bool
 	allowRespBody bool
 }
@@ -22,6 +23,7 @@ func NewLogMiddlewareBuilder(logFn func(ctx context.Context, l AccessLog)) *LogM
 	}
 }
 
+// note 方便链式调用
 func (l *LogMiddlewareBuilder) AllowReqBody() *LogMiddlewareBuilder {
 	l.allowReqBody = true
 	return l
@@ -45,7 +47,7 @@ func (l *LogMiddlewareBuilder) Build() gin.HandlerFunc {
 			Method: method,
 		}
 		if l.allowReqBody {
-			// Request.Body 是一个 Stream 对象，只能读一次
+			// note Request.Body 是一个 Stream 对象，只能读一次
 			// 不处理这个err
 			body, _ := ctx.GetRawData()
 			if len(body) > 2048 {
@@ -53,12 +55,13 @@ func (l *LogMiddlewareBuilder) Build() gin.HandlerFunc {
 			} else {
 				al.ReqBody = string(body)
 			}
-			// 放回去
+			// note 放回去
 			ctx.Request.Body = io.NopCloser(bytes.NewReader(body))
 			//ctx.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 		}
 		start := time.Now()
 
+		// note 骚操作，装饰器模式
 		if l.allowRespBody {
 			ctx.Writer = &responseWriter{
 				ResponseWriter: ctx.Writer,
@@ -88,6 +91,7 @@ type AccessLog struct {
 	Duration time.Duration `json:"duration"`
 }
 
+// note 装饰器模式
 type responseWriter struct {
 	gin.ResponseWriter
 	al *AccessLog

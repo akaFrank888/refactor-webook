@@ -28,6 +28,7 @@ func (b *LoginJWTMiddleWareBuilder) CheckLogin() gin.HandlerFunc {
 			path == "/oauth2/wechat/callback" {
 			return
 		}
+
 		// 一、JTW的登录校验：解析JWT
 		tokenStr := b.ExtractToken(ctx)
 
