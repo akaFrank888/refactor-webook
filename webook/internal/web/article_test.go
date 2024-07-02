@@ -20,14 +20,14 @@ import (
 func TestArticleHandler_Publish(t *testing.T) {
 	testcases := []struct {
 		name     string
-		mock     func(ctrl *gomock.Controller) service.ArticleService
+		mock     func(ctrl *gomock.Controller) (service.ArticleService, service.InteractiveService)
 		reqBody  string
 		wantCode int
 		wantRes  Result
 	}{
 		{
 			name: "新建并发表成功",
-			mock: func(ctrl *gomock.Controller) service.ArticleService {
+			mock: func(ctrl *gomock.Controller) (service.ArticleService, service.InteractiveService) {
 				articleSvc := svcmocks.NewMockArticleService(ctrl)
 				articleSvc.EXPECT().Publish(gomock.Any(), domain.Article{
 					Title:   "测试标题",
@@ -36,7 +36,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 						Id: 123,
 					},
 				}).Return(int64(1), nil)
-				return articleSvc
+				return articleSvc, nil
 			},
 			reqBody:  `{"title":"测试标题", "content":"测试内容"}`,
 			wantCode: http.StatusOK,
@@ -47,7 +47,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 		},
 		{
 			name: "已有帖子发表成功",
-			mock: func(ctrl *gomock.Controller) service.ArticleService {
+			mock: func(ctrl *gomock.Controller) (service.ArticleService, service.InteractiveService) {
 				articleSvc := svcmocks.NewMockArticleService(ctrl)
 				articleSvc.EXPECT().Publish(gomock.Any(), domain.Article{
 					Id:      1,
@@ -57,7 +57,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 						Id: 123,
 					},
 				}).Return(int64(1), nil)
-				return articleSvc
+				return articleSvc, nil
 			},
 			reqBody:  `{"id":1, "title":"测试标题", "content":"测试内容"}`,
 			wantCode: http.StatusOK,
@@ -68,7 +68,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 		},
 		{
 			name: "发表失败",
-			mock: func(ctrl *gomock.Controller) service.ArticleService {
+			mock: func(ctrl *gomock.Controller) (service.ArticleService, service.InteractiveService) {
 				articleSvc := svcmocks.NewMockArticleService(ctrl)
 				articleSvc.EXPECT().Publish(gomock.Any(), domain.Article{
 					Id:      1,
@@ -78,7 +78,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 						Id: 123,
 					},
 				}).Return(int64(0), errors.New("mock error"))
-				return articleSvc
+				return articleSvc, nil
 			},
 			reqBody:  `{"id":1, "title":"测试标题", "content":"测试内容"}`,
 			wantCode: http.StatusOK,
@@ -89,9 +89,9 @@ func TestArticleHandler_Publish(t *testing.T) {
 		},
 		{
 			name: "Bind错误",
-			mock: func(ctrl *gomock.Controller) service.ArticleService {
+			mock: func(ctrl *gomock.Controller) (service.ArticleService, service.InteractiveService) {
 				articleSvc := svcmocks.NewMockArticleService(ctrl)
-				return articleSvc
+				return articleSvc, nil
 			},
 			reqBody:  `{"title":"测试标题", "content":"测试内"fdsfd}`,
 			wantCode: http.StatusBadRequest,
@@ -105,9 +105,9 @@ func TestArticleHandler_Publish(t *testing.T) {
 			defer ctrl.Finish()
 
 			// 利用mock构造svc
-			articleSvc := tc.mock(ctrl)
+			articleSvc, interactiveSvc := tc.mock(ctrl)
 			// 构造hdl
-			hdl := NewArticleHandler(articleSvc, logger.NewNopLogger())
+			hdl := NewArticleHandler(articleSvc, interactiveSvc, logger.NewNopLogger())
 			// 准备服务器和注册路由
 			server := gin.Default()
 			// note 设置登录态

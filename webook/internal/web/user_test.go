@@ -224,6 +224,50 @@ func TestUserHandler_SignUp(t *testing.T) {
 	}
 }
 
+func TestUserHandler_LoginJWT(t *testing.T) {
+	testCases := []struct {
+		name string
+		mock func(ctrl *gomock.Controller) (service.UserService, service.CodeService, ijwt.Handler)
+		// 预期中的输入
+		reqBuilder func(t *testing.T) *http.Request
+		// 预期中的输出
+		wantCode int
+		wantBody Result
+	}{
+		{},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. 构造ctrl
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			// 2. mock出来需要的svc
+			userSvc, codeSvc, jwtHdl := tc.mock(ctrl)
+			// 3. 构造hdl
+			hdl := NewUserHandler(userSvc, codeSvc, jwtHdl)
+			// 4.
+			// 准备服务器和注册路由
+			server := gin.Default()
+			hdl.RegisterRoutes(server)
+			// 准备请求和响应
+			req := tc.reqBuilder(t)
+			recorder := httptest.NewRecorder()
+
+			// 本地接收http请求
+			server.ServeHTTP(recorder, req)
+
+			// 断言结果
+			assert.Equal(t, tc.wantCode, recorder.Code)
+			// 对res反序列化
+			var res Result
+			err := json.NewDecoder(recorder.Body).Decode(&res)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantBody, res)
+		})
+	}
+}
+
 func TestEmailPattern(t *testing.T) {
 	testCases := []struct {
 		// 用例的名字，说请测试的场景

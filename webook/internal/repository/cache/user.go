@@ -29,11 +29,6 @@ func NewUserCache(cmd redis.Cmdable) UserCache {
 	}
 }
 
-// key内部方法（不暴露在接口中）
-func (uc *RedisUserCache) key(id int64) string {
-	return fmt.Sprintf("user:info:%d", id) // note 向repo层屏蔽key的组成
-}
-
 func (uc *RedisUserCache) Set(ctx context.Context, user domain.User) error {
 	key := uc.key(user.Id)
 	val, err := json.Marshal(user) // note 向repo层屏蔽序列化过程
@@ -55,7 +50,13 @@ func (uc *RedisUserCache) Get(ctx context.Context, id int64) (domain.User, error
 }
 
 func (uc *RedisUserCache) Del(ctx context.Context, id int64) error {
+
 	return uc.cmd.Del(ctx, uc.key(id)).Err()
+}
+
+// key内部方法（不暴露在接口中）
+func (uc *RedisUserCache) key(id int64) string {
+	return fmt.Sprintf("user:info:%d", id) // note 向repo层屏蔽key的组成
 }
 
 /*

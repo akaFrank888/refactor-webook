@@ -8,7 +8,7 @@ mock:
 	@mockgen `-source=./webook/internal/repository/cache/user.go -package=cachemocks `-destination=./webook/internal/repository/cache/mocks/user.mock.go
 	@mockgen `-source=./webook/internal/repository/cache/code.go -package=cachemocks `-destination=./webook/internal/repository/cache/mocks/code.mock.go
 	@mockgen `-source=./webook/internal/repository/dao/user.go -package=daomocks `-destination=./webook/internal/repository/dao/mocks/user.mock.go
-	@mockgen -package=redismocks `-destination=./webook/internal/repository/cache/redismocks/cmd.mock.go github.com/redis/go-redis/v9 Cmdable
+	@mockgen `-package=redismocks `-destination=./webook/internal/repository/cache/redismocks/cmd.mock.go github.com/redis/go-redis/v9 Cmdable
 	# 测试article
 	@mockgen `-source=./webook/internal/service/article.go `-package=svcmocks `-destination=./webook/internal/service/mocks/article.mock.go
 	@mockgen `-source=./webook/internal/repository/article.go `-package=repomocks `-destination=./webook/internal/repository/mocks/article.mock.go

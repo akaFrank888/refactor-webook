@@ -255,7 +255,7 @@ func (repo *CachedArticleRepository) GetById(ctx context.Context, id int64) (dom
 		// 回写缓存
 		er := repo.cache.Set(ctx, repo.toDomain(article))
 		if er != nil {
-			// 日志
+			// 日志或重试
 		}
 	}()
 

@@ -40,6 +40,51 @@ func (m *MockArticleService) EXPECT() *MockArticleServiceMockRecorder {
 	return m.recorder
 }
 
+// GetByAuthor mocks base method.
+func (m *MockArticleService) GetByAuthor(ctx context.Context, uid int64, offset, limit int) ([]domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByAuthor", ctx, uid, offset, limit)
+	ret0, _ := ret[0].([]domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByAuthor indicates an expected call of GetByAuthor.
+func (mr *MockArticleServiceMockRecorder) GetByAuthor(ctx, uid, offset, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAuthor", reflect.TypeOf((*MockArticleService)(nil).GetByAuthor), ctx, uid, offset, limit)
+}
+
+// GetById mocks base method.
+func (m *MockArticleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetById", ctx, id)
+	ret0, _ := ret[0].(domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetById indicates an expected call of GetById.
+func (mr *MockArticleServiceMockRecorder) GetById(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetById", reflect.TypeOf((*MockArticleService)(nil).GetById), ctx, id)
+}
+
+// GetPubById mocks base method.
+func (m *MockArticleService) GetPubById(ctx context.Context, id, uid int64) (domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPubById", ctx, id, uid)
+	ret0, _ := ret[0].(domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPubById indicates an expected call of GetPubById.
+func (mr *MockArticleServiceMockRecorder) GetPubById(ctx, id, uid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPubById", reflect.TypeOf((*MockArticleService)(nil).GetPubById), ctx, id, uid)
+}
+
 // Publish mocks base method.
 func (m *MockArticleService) Publish(ctx context.Context, article domain.Article) (int64, error) {
 	m.ctrl.T.Helper()
@@ -68,4 +113,18 @@ func (m *MockArticleService) Save(ctx context.Context, article domain.Article) (
 func (mr *MockArticleServiceMockRecorder) Save(ctx, article any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockArticleService)(nil).Save), ctx, article)
+}
+
+// Withdraw mocks base method.
+func (m *MockArticleService) Withdraw(ctx context.Context, uid, aid int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Withdraw", ctx, uid, aid)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Withdraw indicates an expected call of Withdraw.
+func (mr *MockArticleServiceMockRecorder) Withdraw(ctx, uid, aid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Withdraw", reflect.TypeOf((*MockArticleService)(nil).Withdraw), ctx, uid, aid)
 }
