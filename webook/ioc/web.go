@@ -1,12 +1,17 @@
 package ioc
 
 import (
+	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"refactor-webook/webook/internal/web"
 	ijwt "refactor-webook/webook/internal/web/jwt"
 	"refactor-webook/webook/internal/web/middleware"
+	"refactor-webook/webook/pkg/ginx/accesslog"
 	"refactor-webook/webook/pkg/ginx/prometheus"
+	"refactor-webook/webook/pkg/ginx/ratelimit"
+	"refactor-webook/webook/pkg/limiter"
 	"refactor-webook/webook/pkg/logger"
 	"strings"
 	"time"
@@ -49,16 +54,16 @@ func InitGinMiddlewares(hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
 			println("第二个middleware")
 		},
 
-		//// note 限流
-		//ratelimit.NewBuilder(redis.NewClient(&redis.Options{
-		//	Addr: "localhost:6379",
-		//}), time.Second, 100).Build(),
-		//
-		//// note 日志
-		//accesslog.NewLogMiddlewareBuilder(func(ctx context.Context, al accesslog.AccessLog) {
-		//	// 打印 debug 级别的
-		//	l.Debug("", logger.Field{Key: "req", Val: al})
-		//}).AllowReqBody().AllowRespBody().Build(),
+		// note 限流
+		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redis.NewClient(&redis.Options{
+			Addr: "localhost:6379",
+		}), time.Second, 100)).Build(),
+
+		// note 日志
+		accesslog.NewLogMiddlewareBuilder(func(ctx context.Context, al accesslog.AccessLog) {
+			// 打印 debug 级别的
+			l.Debug("", logger.Field{Key: "req", Val: al})
+		}).AllowReqBody().AllowRespBody().Build(),
 
 		// note prometheus
 		prometheus.NewBuilder(

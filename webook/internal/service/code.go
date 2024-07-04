@@ -18,6 +18,9 @@ var ErrCodeSendTooMany = repository.ErrCodeSendTooMany
 type codeService struct {
 	repo repository.CodeRepository
 	sms  sms.Service
+	// 短信服务（一）为短信服务添加限流
+	// limitSmsSvc ratelimit.RateLimitSmsService
+	//
 }
 
 func NewCodeService(repo repository.CodeRepository, sms sms.Service) CodeService {

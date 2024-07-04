@@ -17,3 +17,6 @@ mock:
 	@mockgen `-source=./webook/internal/repository/dao/article_author.go `-package=daomocks `-destination=./webook/internal/repository/dao/mocks/article_author.mock.go
 	@mockgen `-source=./webook/internal/repository/dao/article_reader.go `-package=daomocks `-destination=./webook/internal/repository/dao/mocks/article_reader.mock.go
 	@go mod tidy
+	# 测试短信服务的第三方治理
+	@mockgen `-source=./webook/internal/service/sms/types.go -package=smsmocks `-destination=./webook/internal/service/sms/mocks/types.mock.go
+	@mockgen `-source=./webook/pkg/limiter/types.go -package=limitermocks `-destination=./webook/pkg/limiter/mocks/types.mock.go
