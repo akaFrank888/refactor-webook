@@ -33,6 +33,6 @@ func NewSmsServiceRateLimit(svc sms.Service, l limiter.Limiter) *RateLimitSmsSer
 	return &RateLimitSmsService{
 		svc: svc,
 		l:   l,
-		key: "sms-tencent-limit",
+		key: "sms_project-tencent-limit",
 	}
 }

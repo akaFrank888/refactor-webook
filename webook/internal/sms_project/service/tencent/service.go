@@ -6,7 +6,6 @@ import (
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	tencentSMS "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111" // 引入sms
 	"go.uber.org/zap"
-	"refactor-webook/webook/internal/service/sms"
 )
 
 type Service struct {
@@ -16,13 +15,8 @@ type Service struct {
 	signName *string
 }
 
-func NewService(client *tencentSMS.Client, appId, signName string) sms.Service {
-	return &Service{
-		client:   client,
-		appId:    &appId,
-		signName: &signName,
-	}
-
+func NewService(client *tencentSMS.Client, appId *string, signName *string) *Service {
+	return &Service{client: client, appId: appId, signName: signName}
 }
 
 func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {

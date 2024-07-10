@@ -5,15 +5,23 @@ import (
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
 	tencentSMS "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
 	"os"
-	"refactor-webook/webook/internal/service/localsms"
 	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/service/sms/auth"
 	"refactor-webook/webook/internal/service/sms/tencent"
 )
 
 func InitSMSService() sms.Service {
-	return localsms.NewService()
+
+	//return ratelimit.NewSmsServiceRateLimit(initTencentSMSService(), limiter.NewRedisSlidingWindowLimiter(
+	//	redis.NewClient(&redis.Options{
+	//		Addr: "localhost:6379",
+	//	}), time.Second, 100))
+
+	return auth.NewSmsService(initTencentSMSService())
+	// return localsms.NewService()
 }
 
+// 腾讯的配置
 func initTencentSMSService() sms.Service {
 	secretId, ok := os.LookupEnv("SMS_SECRET_ID")
 	if !ok {
@@ -33,3 +41,5 @@ func initTencentSMSService() sms.Service {
 	}
 	return tencent.NewService(c, "1400842696", "妙影科技")
 }
+
+// 阿里的配置

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"refactor-webook/webook/internal/service/sms"
-	smsmocks "refactor-webook/webook/internal/service/sms/mocks"
+	smsmocks "refactor-webook/webook/internal/service/sms_project/mocks"
 	"refactor-webook/webook/pkg/limiter"
 	limitermocks "refactor-webook/webook/pkg/limiter/mocks"
 	"testing"

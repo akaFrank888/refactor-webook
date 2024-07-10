@@ -19,3 +19,6 @@ func String(key string, val string) Field {
 func Int(key string, val int) Field {
 	return Field{Key: key, Val: val}
 }
+func Bool(key string, val bool) Field {
+	return Field{Key: key, Val: val}
+}
