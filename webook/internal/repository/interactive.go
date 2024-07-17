@@ -32,12 +32,16 @@ func NewCachedInteractiveRepository(dao dao.InteractiveDao, cache cache.Interact
 }
 
 func (c *CachedInteractiveRepository) IncrLike(ctx context.Context, biz string, bizId int64, uid int64) error {
-	// note 关于区别于阅读数+1的命名：因为dao层除了实现点赞数+1，还要标记已赞状态
+	// note 命名：区别于阅读数 +1 的命名，因为 dao 层除了实现点赞数 +1，还要标记已赞状态
 	err := c.dao.InsertLikeInfo(ctx, biz, bizId, uid)
 	if err != nil {
 		return err
 	}
-	return c.cache.IncrLikeCntIfExist(ctx, biz, bizId)
+	err = c.cache.IncrLikeCntIfExist(ctx, biz, bizId)
+	if err != nil {
+		return err
+	}
+	return c.cache.IncrRankingIfExist(ctx, biz, bizId)
 }
 
 func (c *CachedInteractiveRepository) DecrLike(ctx context.Context, biz string, bizId int64, uid int64) error {

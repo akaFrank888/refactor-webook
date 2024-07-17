@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"refactor-webook/webook/internal/repository"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 )
 
 type CodeService interface {
@@ -17,13 +17,13 @@ var ErrCodeSendTooMany = repository.ErrCodeSendTooMany
 
 type codeService struct {
 	repo repository.CodeRepository
-	sms  sms.Service
+	sms  service.Service
 	// 短信服务（一）为短信服务添加限流
 	// limitSmsSvc ratelimit.RateLimitSmsService
 	//
 }
 
-func NewCodeService(repo repository.CodeRepository, sms sms.Service) CodeService {
+func NewCodeService(repo repository.CodeRepository, sms service.Service) CodeService {
 	return &codeService{
 		repo: repo,
 		sms:  sms,

@@ -27,7 +27,7 @@ func (h *Handler[T]) Cleanup(session sarama.ConsumerGroupSession) error {
 func (h *Handler[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	msgs := claim.Messages()
 	for msg := range msgs {
-		// note 先反序列化成readEvent，再执行业务处理逻辑
+		// note 执行业务处理逻辑（统一在这里的 handler 中实现 领域事件的 json 反序列化）
 		var t T
 		err := json.Unmarshal(msg.Value, &t)
 		if err != nil {

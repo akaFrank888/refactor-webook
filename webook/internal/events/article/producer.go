@@ -11,6 +11,7 @@ type Producer interface {
 
 const TopicReadEvent = "article_read"
 
+// ReadEvent 描述阅读这个事件：“谁读了哪篇文章”
 type ReadEvent struct {
 	Aid int64
 	Uid int64

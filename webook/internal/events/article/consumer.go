@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type ReadEventConsumer interface {
+	Consume(msg *sarama.ConsumerMessage, event ReadEvent) error
+	BatchConsume(msgs []*sarama.ConsumerMessage, evts []ReadEvent) error
+}
 type InteractiveReadEventConsumer struct {
 	repo   repository.InteractiveRepository
 	client sarama.Client
@@ -17,6 +21,26 @@ type InteractiveReadEventConsumer struct {
 
 func NewInteractiveReadEventConsumer(repo repository.InteractiveRepository, client sarama.Client, l logger.LoggerV1) *InteractiveReadEventConsumer {
 	return &InteractiveReadEventConsumer{repo: repo, client: client, l: l}
+}
+
+// Consume 对应 saramax.Handler中的fn方法
+func (i *InteractiveReadEventConsumer) Consume(msg *sarama.ConsumerMessage, event ReadEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return i.repo.IncrReadCnt(ctx, "article", event.Aid)
+}
+
+func (r *InteractiveReadEventConsumer) BatchConsume(msgs []*sarama.ConsumerMessage,
+	evts []ReadEvent) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	bizs := make([]string, 0, len(msgs))
+	ids := make([]int64, 0, len(msgs))
+	for _, evt := range evts {
+		bizs = append(bizs, "article")
+		ids = append(ids, evt.Uid)
+	}
+	return r.repo.BatchIncrReadCnt(ctx, bizs, ids)
 }
 
 // Start note 启动 consumer 的方法，实现了自定义接口
@@ -43,32 +67,12 @@ func (r *InteractiveReadEventConsumer) StartBatch() error {
 		return err
 	}
 	go func() {
-		err := cg.Consume(context.Background(),
+		er := cg.Consume(context.Background(),
 			[]string{TopicReadEvent},
 			saramax.NewBatchHandler[ReadEvent](r.l, r.BatchConsume))
-		if err != nil {
-			r.l.Error("退出了消费循环异常", logger.Error(err))
+		if er != nil {
+			r.l.Error("退出了消费循环异常", logger.Error(er))
 		}
 	}()
 	return err
-}
-
-// Consume 对应 saramax.Handler中的fn方法
-func (i *InteractiveReadEventConsumer) Consume(msg *sarama.ConsumerMessage, event ReadEvent) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	return i.repo.IncrReadCnt(ctx, "article", event.Aid)
-}
-
-func (r *InteractiveReadEventConsumer) BatchConsume(msgs []*sarama.ConsumerMessage,
-	evts []ReadEvent) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	bizs := make([]string, 0, len(msgs))
-	ids := make([]int64, 0, len(msgs))
-	for _, evt := range evts {
-		bizs = append(bizs, "article")
-		ids = append(ids, evt.Uid)
-	}
-	return r.repo.BatchIncrReadCnt(ctx, bizs, ids)
 }

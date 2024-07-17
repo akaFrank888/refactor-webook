@@ -200,7 +200,7 @@ func (dao *GormInteractiveDao) BatchIncrReadCnt(ctx context.Context, bizs []stri
 type Interactive struct {
 	id int64 `gorm:"primaryKey, autoIncrement"`
 
-	// note bizId更有序分度，所以bizId写在前面，建立 <biz_id,biz>的联合唯一索引
+	// note bizId 更有序分度，所以 bizId 写在前面，建立 <biz_id,biz>的联合唯一索引
 	BizId int64  `gorm:"uniqueIndex:idx_biz_id_biz"`
 	Biz   string `type:"varchar(128), gorm:uniqueIndex:idx_biz_id_biz"`
 

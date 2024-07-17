@@ -13,11 +13,18 @@ import (
 //go:embed lua/incr_cnt.lua
 var luaIncrCnt string
 
+//go:embed lua/interactive_ranking_incr.lua
+var luaRankingCnt string
+
+//go:embed lua/interactive_ranking_set.lua
+var luaRankingSet string
+
 const fieldReadCnt = "read_cnt"
 const fieldLikeCnt = "like_cnt"
 const fieldCollectionCnt = "collect_cnt"
 
 type InteractiveCache interface {
+	// IncrReadCntIfExist note “IfExist”的含义是：如果 redis 中没有数据结构，则该方法不会执行任何操作（需要通过日志来检测并另去别的流程执行 set 方法）
 	IncrReadCntIfExist(ctx context.Context, biz string, bizId int64) error
 	IncrLikeCntIfExist(ctx context.Context, biz string, bizId int64) error
 	DecrLikeCntIfExist(ctx context.Context, biz string, bizId int64) error
@@ -25,6 +32,11 @@ type InteractiveCache interface {
 	DecrCollectCntIfExist(ctx context.Context, biz string, bizId int64) error
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Set(ctx context.Context, biz string, bizId int64, inter domain.Interactive) error
+
+	// LikeTop note 利用 zset 实现找出点赞数top100的数据
+	LikeTop(ctx context.Context, biz string) ([]domain.Interactive, error)
+	IncrRankingIfExist(ctx context.Context, biz string, bizId int64) error
+	SetRankingScore(ctx context.Context, biz string, bizId int64, score int64) error
 }
 
 type RedisInteractiveCache struct {
@@ -38,7 +50,7 @@ func NewRedisInteractiveCache(client redis.Cmdable) InteractiveCache {
 
 func (c *RedisInteractiveCache) IncrReadCntIfExist(ctx context.Context, biz string, bizId int64) error {
 	key := c.key(biz, bizId)
-	// 业务上：返回的1或0可以不考虑
+	// 业务上：返回的 1 或 0 可以不考虑
 	_, err := c.client.Eval(ctx, luaIncrCnt, []string{key}, fieldReadCnt, 1).Int()
 	return err
 }
@@ -99,6 +111,51 @@ func (c *RedisInteractiveCache) Set(ctx context.Context, biz string, bizId int64
 	return err
 }
 
+// BatchSetRankingScore 将所有 interactive 存进 zset 中
+func (c *RedisInteractiveCache) BatchSetRankingScore(ctx context.Context, biz string, interactives []domain.Interactive) error {
+	zs := make([]redis.Z, 0, len(interactives))
+	for _, interactive := range interactives {
+		zs = append(zs, redis.Z{
+			Score:  float64(interactive.LikeCnt),
+			Member: interactive.BizId,
+		})
+	}
+	return c.client.ZAdd(ctx, c.rankingKey(biz), zs...).Err()
+}
+
+func (c *RedisInteractiveCache) LikeTop(ctx context.Context, biz string) ([]domain.Interactive, error) {
+	var start int64 = 0
+	var end int64 = 99
+	res, err := c.client.ZRangeWithScores(ctx, c.rankingKey(biz), start, end).Result()
+	if err != nil {
+		return nil, err
+	}
+	interactives := make([]domain.Interactive, 0, len(res))
+	for _, z := range res {
+		val, _ := strconv.ParseInt(z.Member.(string), 10, 64)
+		interactives = append(interactives, domain.Interactive{
+			BizId:   val,
+			Biz:     biz,
+			LikeCnt: int64(z.Score),
+		})
+	}
+	return interactives, nil
+}
+
+func (c *RedisInteractiveCache) IncrRankingIfExist(ctx context.Context, biz string, bizId int64) error {
+	_, err := c.client.Eval(ctx, luaRankingCnt, []string{c.rankingKey(biz)}, bizId).Result()
+	return err
+}
+
+func (c *RedisInteractiveCache) SetRankingScore(ctx context.Context, biz string, bizId int64, score int64) error {
+	_, err := c.client.Eval(ctx, luaRankingSet, []string{c.rankingKey(biz)}, bizId, score).Result()
+	return err
+}
+
 func (c *RedisInteractiveCache) key(biz string, bizId int64) string {
 	return fmt.Sprintf("interactive:%s:%d", biz, bizId)
+}
+
+func (c *RedisInteractiveCache) rankingKey(biz string) string {
+	return fmt.Sprintf("top_100_%s", biz)
 }

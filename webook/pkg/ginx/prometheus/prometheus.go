@@ -21,7 +21,7 @@ func NewBuilder(name string, namespace string, subsystem string, instanceID stri
 
 // BuildResponseTime 统计http请求响应时间
 func (b *Builder) BuildResponseTime() gin.HandlerFunc {
-	// 分 请求方法、命中的路由和响应码
+	// note 分 请求方法、命中的路由和响应码
 	labels := []string{"method", "pattern", "status"}
 	vector := prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		// note 这三个都不能有除了下划线以外的字符！！！

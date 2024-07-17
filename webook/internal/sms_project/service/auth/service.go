@@ -3,16 +3,16 @@ package auth
 import (
 	"context"
 	"github.com/golang-jwt/jwt/v5"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 )
 
 // SmsService 装饰器
 type SmsService struct {
-	svc sms.Service
+	svc service.Service
 	key string
 }
 
-func NewSmsService(svc sms.Service) *SmsService {
+func NewSmsService(svc service.Service) *SmsService {
 	return &SmsService{
 		svc: svc,
 		key: "oIft1b5qZjyLcc0zZo2UrUx5rk3KE0LvZKv73fw502oXd6vfYu1OAQvbSel8whv1",

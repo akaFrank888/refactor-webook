@@ -61,6 +61,6 @@ func (i *interactiveService) Get(ctx context.Context, biz string, bizId int64, u
 		return er
 	})
 
-	// note 如果要考虑降级策略（缓解mysql和redis的压力）获取interactive时报错，甚至可以不返回err返回nil，因为不影响article的核心业务
+	// note 如果要考虑降级策略（缓解 mysql 和 redis 的压力），获取 interactive 时报错，甚至可以不返回 err 返回 nil ，因为不影响 article 的核心业务
 	return inter, eg.Wait()
 }
