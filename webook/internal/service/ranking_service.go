@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/ecodeclub/ekit/queue"
-	"log"
 	"math"
 	"refactor-webook/webook/internal/domain"
+	"refactor-webook/webook/internal/repository"
 	"time"
 )
 
@@ -24,9 +24,11 @@ type BatchRankingService struct {
 	n int64
 	// 计算 score
 	scoreFunc func(likeCnt int64, utime time.Time) float64
+
+	repo repository.RankingRepository
 }
 
-func NewBatchRankingService(articleSvc ArticleService, interSvc InteractiveService) *BatchRankingService {
+func NewBatchRankingService(articleSvc ArticleService, interSvc InteractiveService) RankingService {
 	return &BatchRankingService{
 		articleSvc: articleSvc,
 		interSvc:   interSvc,
@@ -46,9 +48,7 @@ func (b *BatchRankingService) TopN(ctx context.Context) error {
 	}
 
 	// 最后将 articles 存入缓存中
-	log.Println(articles)
-
-	return nil
+	return b.repo.ReplaceTopN(ctx, articles)
 }
 
 // 因为仅想通过单元测试测试一下榜单计算的算法，而原 TopN 会存入缓存不方便测试，所以就写一个 topN 来只执行榜单算法
