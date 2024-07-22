@@ -7,6 +7,7 @@ import (
 	"refactor-webook/webook/internal/repository"
 )
 
+//go:generate mockgen -source=./interactive.go -package=svcmocks -destination=./mocks/interactive.mock.go InteractiveService
 type InteractiveService interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
 	Like(ctx context.Context, biz string, bizId int64, uid int64) error
@@ -14,6 +15,8 @@ type InteractiveService interface {
 	Collect(ctx context.Context, biz string, bizId int64, uid int64, cid int64) error
 	CancelCollect(ctx context.Context, biz string, bizId int64, uid int64, cid int64) error
 	Get(ctx context.Context, biz string, bizId int64, uid int64) (domain.Interactive, error)
+	// GetByIds 用于榜单模型
+	GetByIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interactive, error)
 }
 
 type interactiveService struct {
@@ -63,4 +66,16 @@ func (i *interactiveService) Get(ctx context.Context, biz string, bizId int64, u
 
 	// note 如果要考虑降级策略（缓解 mysql 和 redis 的压力），获取 interactive 时报错，甚至可以不返回 err 返回 nil ，因为不影响 article 的核心业务
 	return inter, eg.Wait()
+}
+
+func (i *interactiveService) GetByIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interactive, error) {
+	inters, err := i.repo.GetByIds(ctx, biz, bizIds)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[int64]domain.Interactive, len(inters))
+	for _, inter := range inters {
+		res[inter.BizId] = inter
+	}
+	return res, nil
 }

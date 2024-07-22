@@ -31,7 +31,7 @@ func (s *AsyncService) StartAsyncCycle() {
 }
 
 func (s *AsyncService) AsyncSend() {
-	// 不断询问数据库有无waiting的sms的过程中，避免无限制的阻塞 ==> 创建一个限时的ctx
+	// 不断询问数据库有无 waiting 的 sms 的过程中，避免无限制的阻塞 ==> 创建一个限时的 ctx
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	// note 基于 数据库行级锁 的机制，实现了抢占式调度
 	// note 确保在 K8s环境中部署的多个 Pod 中，针对同一个异步短信发送请求，只有一个 Pod 实例能够成功获取并处理

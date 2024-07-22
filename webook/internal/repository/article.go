@@ -21,6 +21,7 @@ type ArticleRepository interface {
 
 	// 读者
 	GetPubById(ctx context.Context, id int64) (domain.Article, error)
+	ListPub(ctx context.Context, ddl time.Time, offset int, limit int) ([]domain.Article, error)
 }
 
 type CachedArticleRepository struct {
@@ -210,7 +211,7 @@ func (repo *CachedArticleRepository) GetByAuthor(ctx context.Context, uid int64,
 	if err != nil {
 		return nil, err
 	}
-	// note 将articles中的每一个dao类型的article转成domain类型的article
+	// note 将 articles 中的每一个 dao 类型的 article 转成 domain 类型的 article
 	res := kit.Map[dao.Article, domain.Article](articles, func(idx int, article dao.Article) domain.Article {
 		return repo.toDomain(article)
 	})
@@ -291,6 +292,16 @@ func (repo *CachedArticleRepository) GetPubById(ctx context.Context, id int64) (
 
 	return res, nil
 
+}
+
+func (repo *CachedArticleRepository) ListPub(ctx context.Context, ddl time.Time, offset int, limit int) ([]domain.Article, error) {
+	arts, err := repo.dao.ListPub(ctx, ddl, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	return kit.Map(arts, func(idx int, src dao.Article) domain.Article {
+		return repo.toDomain(src)
+	}), nil
 }
 
 func (repo *CachedArticleRepository) toPersistent(article domain.Article) dao.Article {

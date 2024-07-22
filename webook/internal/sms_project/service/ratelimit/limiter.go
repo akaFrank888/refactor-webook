@@ -3,7 +3,7 @@ package ratelimit
 import (
 	"context"
 	"errors"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 	"refactor-webook/webook/pkg/limiter"
 )
 
@@ -11,7 +11,7 @@ var ErrLimited = errors.New("触发短信服务限流")
 
 type RateLimitSmsService struct {
 	// svc是被装饰者
-	svc sms.Service
+	svc service.Service
 	l   limiter.Limiter
 	key string
 }
@@ -29,7 +29,7 @@ func (s *RateLimitSmsService) Send(ctx context.Context, tplId string, args []str
 	return s.svc.Send(ctx, tplId, args, numbers...)
 }
 
-func NewSmsServiceRateLimit(svc sms.Service, l limiter.Limiter) *RateLimitSmsService {
+func NewSmsServiceRateLimit(svc service.Service, l limiter.Limiter) *RateLimitSmsService {
 	return &RateLimitSmsService{
 		svc: svc,
 		l:   l,

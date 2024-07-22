@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"refactor-webook/webook/internal/domain"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type ArticleDao interface {
 
 	// GetPubById 读者 ，需要用 PublishedArticle 类型
 	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
+	ListPub(ctx context.Context, ddl time.Time, offset int, limit int) ([]Article, error)
 }
 
 type GormArticleDao struct {
@@ -195,6 +197,16 @@ func (dao *GormArticleDao) GetPubById(ctx context.Context, id int64) (PublishedA
 	var article PublishedArticle
 	err := dao.db.WithContext(ctx).Where("id = ?", id).First(&article).Error
 	return article, err
+}
+
+func (dao *GormArticleDao) ListPub(ctx context.Context, ddl time.Time, offset int, limit int) ([]Article, error) {
+	var articles []Article
+	err := dao.db.WithContext(ctx).Where("utime < ? AND status = ?", ddl.UnixMilli(), domain.ArticleStatusPublished).
+		Offset(offset).
+		Limit(limit).
+		Find(&articles).
+		Order("utime desc").Error
+	return articles, err
 }
 
 type Article struct {

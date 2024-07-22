@@ -3,18 +3,18 @@ package retry
 import (
 	"context"
 	"errors"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 	"sync/atomic"
 	"time"
 )
 
 type RetrySmsService struct {
-	svc         sms.Service
+	svc         service.Service
 	MaxAttempts int32
 	Delay       time.Duration
 }
 
-func NewRetrySmsService(svc sms.Service, maxAttempts int32) *RetrySmsService {
+func NewRetrySmsService(svc service.Service, maxAttempts int32) *RetrySmsService {
 	return &RetrySmsService{svc: svc, MaxAttempts: maxAttempts, Delay: time.Second * 3}
 }
 

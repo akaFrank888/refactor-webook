@@ -4,20 +4,20 @@ import (
 	"context"
 	"errors"
 	"log"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 	"sync/atomic"
 )
 
 type FailOverSmsService struct {
 
 	// 候选的服务商
-	svcs []sms.Service
+	svcs []service.Service
 
 	// failover第二种实现（指定svc[idx]开始轮询）的字段
 	idx uint64
 }
 
-func NewFailOverSmsService(svcs []sms.Service) *FailOverSmsService {
+func NewFailOverSmsService(svcs []service.Service) *FailOverSmsService {
 	return &FailOverSmsService{svcs: svcs}
 }
 

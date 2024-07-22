@@ -7,8 +7,10 @@ import (
 	"refactor-webook/webook/internal/events/article"
 	"refactor-webook/webook/internal/repository"
 	"refactor-webook/webook/pkg/logger"
+	"time"
 )
 
+//go:generate mockgen -source=./article.go -package=svcmocks -destination=./mocks/article.mock.go ArticleService
 type ArticleService interface {
 	Save(ctx context.Context, article domain.Article) (int64, error)
 	Publish(ctx context.Context, article domain.Article) (int64, error)
@@ -18,6 +20,9 @@ type ArticleService interface {
 
 	// GetPubById note 读者的服  若是微服务架构，则读者服务和创作者服务会分成两个服务；单体应用可写成一块
 	GetPubById(ctx context.Context, id, uid int64) (domain.Article, error)
+	// ListPub 批量获取线上库的 article ，用于榜单模型   1. 为什么要传入一个时间戳 ddl ？ 因为即使是批量获取的方式，获取全部的 article 也是个耗时的任务
+	// 可能需要几分钟的时间。若期间 article 被插入，则会导致批量获取时重复获取了同一篇 article，所以要引入一个截止时间
+	ListPub(ctx context.Context, ddl time.Time, offset, limit int) ([]domain.Article, error)
 }
 
 type articleService struct {
@@ -67,7 +72,7 @@ func (svc *articleService) Publish(ctx context.Context, article domain.Article) 
 	return svc.repo.Sync(ctx, article)
 }
 
-// PublishV1 note 1.【在service层完成“发表”中制作库和线上库的分发或者叫同步】先新建/更新到“操作库”，再保存到“线上库” 2. 约定 : 操作库喝线上库的帖子 id 是相同的
+// PublishV1 note 1.【在service层完成“发表”中制作库和线上库的分发或者叫同步】先新建/更新到“操作库”，再保存到“线上库” 2. 约定 : 操作库和线上库的帖子 id 是相同的
 func (svc *articleService) PublishV1(ctx context.Context, article domain.Article) (int64, error) {
 	var (
 		id  = article.Id
@@ -142,4 +147,8 @@ func (svc *articleService) GetPubById(ctx context.Context, id, uid int64) (domai
 		}
 	}()
 	return res, err
+}
+
+func (svc *articleService) ListPub(ctx context.Context, ddl time.Time, offset, limit int) ([]domain.Article, error) {
+	return svc.repo.ListPub(ctx, ddl, offset, limit)
 }

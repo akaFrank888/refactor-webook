@@ -2,12 +2,12 @@ package failover
 
 import (
 	"context"
-	"refactor-webook/webook/internal/service/sms"
+	"refactor-webook/webook/internal/sms_project/service"
 	"sync/atomic"
 )
 
 type TimeoutFailoverSmsService struct {
-	svcs []sms.Service
+	svcs []service.Service
 	// 当前使用的服务商
 	idx int32
 	// 记录已经超时的个数

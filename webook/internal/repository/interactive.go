@@ -5,6 +5,7 @@ import (
 	"refactor-webook/webook/internal/domain"
 	"refactor-webook/webook/internal/repository/cache"
 	"refactor-webook/webook/internal/repository/dao"
+	"refactor-webook/webook/pkg/kit"
 	"refactor-webook/webook/pkg/logger"
 )
 
@@ -18,6 +19,7 @@ type InteractiveRepository interface {
 	Get3Cnt(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, bizId int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, bizId int64, uid int64) (bool, error)
+	GetByIds(ctx context.Context, biz string, ids []int64) ([]domain.Interactive, error)
 }
 
 type CachedInteractiveRepository struct {
@@ -146,8 +148,21 @@ func (c *CachedInteractiveRepository) Collected(ctx context.Context, biz string,
 	}
 }
 
+func (c *CachedInteractiveRepository) GetByIds(ctx context.Context, biz string, ids []int64) ([]domain.Interactive, error) {
+	inters, err := c.dao.GetByIds(ctx, biz, ids)
+	if err != nil {
+		return nil, err
+	}
+	return kit.Map(inters, func(idx int, inters dao.Interactive) domain.Interactive {
+		return c.toDomain(inters)
+	}), nil
+}
+
 func (c *CachedInteractiveRepository) toDomain(i dao.Interactive) domain.Interactive {
 	return domain.Interactive{
+		BizId: i.BizId,
+		Biz:   i.Biz,
+
 		ReadCnt:    i.ReadCnt,
 		LikeCnt:    i.LikeCnt,
 		CollectCnt: i.CollectCnt,
