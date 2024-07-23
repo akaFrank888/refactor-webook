@@ -13,6 +13,7 @@ import (
 type RankingService interface {
 	// TopN “为什么不返回 []article？”  因为要将 topN 的 article 存入缓存中
 	TopN(ctx context.Context) error
+	GetTopN(ctx context.Context) ([]domain.Article, error)
 }
 
 type BatchRankingService struct {
@@ -132,4 +133,8 @@ func (b *BatchRankingService) topN(ctx context.Context) ([]domain.Article, error
 		res[i] = ele.article
 	}
 	return res, nil
+}
+
+func (b *BatchRankingService) GetTopN(ctx context.Context) ([]domain.Article, error) {
+	return b.repo.GetTopN(ctx)
 }
